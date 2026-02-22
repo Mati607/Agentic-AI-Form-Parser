@@ -1,0 +1,80 @@
+# AI Document & Form Automation
+
+Upload passport and G-28 (PDF or image), extract data with **BAML + Gemini**, and fill a test form via **Playwright**. The app does not submit or sign the form.
+
+---
+
+## Setup
+
+### 1. API key (Google AI Studio)
+
+1. Go to [Google AI Studio](https://aistudio.google.com/).
+2. Sign in and open **Get API key** (or **API keys** in the left menu).
+3. Create an API key and copy it.
+4. In the project root, create a `.env` file and add:
+
+```bash
+GOOGLE_API_KEY=your_api_key_here
+```
+
+Optional: `FORM_URL`, `HEADLESS`, and Chrome CDP options can be set in `.env` (see [Environment](#environment)).
+
+### 2. Backend
+
+```bash
+cd backend
+poetry install
+poetry run baml-cli generate
+poetry run playwright install chromium
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 3. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173**. Upload passport and/or G-28, then use **Extract only** or **Extract & fill form**.
+
+---
+
+## Tests
+
+Backend unit tests use **pytest** with mocked extraction and form-filling so no API key or browser is required. They cover the FastAPI routes: health, extract (validation, content-type, missing key), and fill (with stubbed Playwright).
+
+From the backend directory:
+
+```bash
+cd backend
+poetry run pytest
+```
+
+Use `-v` for verbose output or `-k "test_name"` to run a subset of tests.
+
+---
+
+## Main functionality
+
+- **Document validation** — Before extraction, each file is checked (passport vs G-28/A-28) via LLM. Invalid document types are rejected with a short reason.
+- **Data extraction** — BAML + Gemini read passport and G-28 images (PDFs are converted to images). All fields are optional so missing or unclear data does not break the pipeline.
+- **Form filling** — Playwright opens the target form and fills fields by matching labels (with fallbacks for placeholder and name). Only non-empty extracted values are written; the form is not submitted.
+
+---
+
+## Environment
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_API_KEY` | **Required.** Google AI API key (from Google AI Studio). |
+| `FORM_URL` | Form URL to fill. Default: `https://mendrika-alma.github.io/form-submission/` |
+| `HEADLESS` | Set to `false` to show the browser when filling the form. |
+
+---
+
+## Tech
+
+- **Backend:** FastAPI, BAML (Gemini), Playwright (Chromium). Poetry.
+- **Frontend:** React (Vite) upload UI.

@@ -1,0 +1,79 @@
+.form-fill-view {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.form-fill-error {
+  color: #721c24;
+  background: #f8d7da;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.form-fill-header {
+  margin-bottom: 1.5rem;
+}
+
+.form-fill-header h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.form-fill-header p {
+  color: #555;
+  margin: 0 0 1rem 0;
+}
+
+.form-fill-open-btn {
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #0d6efd;
+  background: #0d6efd;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.form-fill-open-btn:hover {
+  background: #0b5ed7;
+  border-color: #0b5ed7;
+}
+
+.form-fill-fields {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.form-fill-fields h2 {
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+}
+
+.form-fill-field {
+  margin-bottom: 0.75rem;
+}
+
+.form-fill-field label {
+  display: block;
+  font-weight: 500;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+  color: #333;
+}
+
+.form-fill-field input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.95rem;
+}
+
+.form-fill-field input:read-only {
+  background: #fff;
+  color: #333;
+}
