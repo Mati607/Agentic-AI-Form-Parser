@@ -5,17 +5,6 @@ from baml_py import Image
 from baml_client import b
 
 
-def _pdf_to_png_bytes(pdf_bytes: bytes) -> bytes:
-    import io
-    import fitz  # pymupdf
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    page = doc.load_page(0)
-    pix = page.get_pixmap(dpi=150)
-    png_bytes = pix.tobytes(output="png")
-    doc.close()
-    return png_bytes
-
-
 def _to_dict(obj: Any) -> dict:
     if obj is None:
         return {}
@@ -41,11 +30,13 @@ def _to_dict(obj: Any) -> dict:
 
 
 def _content_to_image(content: bytes, content_type: str) -> Image:
-    if content_type == "application/pdf":
-        content = _pdf_to_png_bytes(content)
-        content_type = "image/png"
     b64 = base64.b64encode(content).decode("ascii")
-    mime = "image/jpeg" if "jpeg" in content_type or "jpg" in content_type else "image/png"
+    if content_type == "application/pdf":
+        mime = "application/pdf"
+    elif "jpeg" in content_type or "jpg" in content_type:
+        mime = "image/jpeg"
+    else:
+        mime = "image/png"
     return Image.from_base64(mime, b64)
 
 

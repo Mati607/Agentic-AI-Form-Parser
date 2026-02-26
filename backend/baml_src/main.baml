@@ -97,7 +97,8 @@ function ValidateG28(doc: image) -> DocumentValidation {
   client GeminiFlash
   prompt #"
     Look at this document image. Determine if it is Form G-28 or Form A-28 (Notice of Entry of Appearance as Attorney or Accredited Representative).
-    - Valid: ONLY USCIS Form G-28 or Form A-28 with Part 1 (Attorney/Representative), Part 2 (Signature), Part 3 (Passport info). Nothing else.
+    - Valid: USCIS Form G-28 or Form A-28 (any edition/version), even if page labels/part numbering differ or specific parts are not visible in the provided image/PDF.
+    - IMPORTANT: Validate document TYPE only. Do NOT require exact section titles such as "Part 2 (Signature)" or "Part 3 (Passport info)" to mark it valid.
     - Invalid: passport, driver's license, national ID, other USCIS forms (I-485, I-130, I-94, etc.), or ANY document that is not G-28 or A-28. When in doubt, respond with is_valid: false.
     Respond with ONLY a single JSON object (no other text). Use exactly these keys: "is_valid" (boolean) and "reason" (string). Set is_valid to true ONLY if the document is clearly and unambiguously Form G-28 or Form A-28; otherwise set is_valid to false and set reason to a brief explanation (e.g. "This appears to be a passport.").
     Example for invalid: {"is_valid": false, "reason": "This appears to be a passport."}
