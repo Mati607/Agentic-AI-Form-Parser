@@ -61,6 +61,8 @@ Use `-v` for verbose output or `-k "test_name"` to run a subset of tests.
 - **Document validation** — Before extraction, each file is checked (passport vs G-28/A-28) via LLM. Invalid document types are rejected with a short reason.
 - **Data extraction** — BAML + Gemini read passport and G-28 images (PDFs are converted to images). All fields are optional so missing or unclear data does not break the pipeline.
 - **Form filling** — Playwright opens the target form and fills fields by matching labels (with fallbacks for placeholder and name). Only non-empty extracted values are written; the form is not submitted.
+- **Fill preview** — `POST /preview-fill` returns which mapped fields have values (same mapping Playwright uses). No browser or Gemini call.
+- **Saved extraction sessions** — Merged extraction JSON can be stored in SQLite (`POST /extraction-sessions`), listed, exported, deleted, and used to run `POST /extraction-sessions/{id}/fill-form` without re-uploading files. The React app includes a sidebar for these sessions.
 
 ---
 
@@ -71,6 +73,7 @@ Use `-v` for verbose output or `-k "test_name"` to run a subset of tests.
 | `GOOGLE_API_KEY` | **Required.** Google AI API key (from Google AI Studio). |
 | `FORM_URL` | Form URL to fill. Default: `https://mendrika-alma.github.io/form-submission/` |
 | `HEADLESS` | Set to `false` to show the browser when filling the form. |
+| `EXTRACTION_DB_PATH` | Optional. Path to the SQLite file for saved sessions. Default: `backend/data/extraction_sessions.db` (created on startup). |
 
 ---
 
