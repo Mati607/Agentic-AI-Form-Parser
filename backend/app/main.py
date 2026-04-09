@@ -10,7 +10,7 @@ try:
 except ImportError:
     pass
 
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import Body, FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import GOOGLE_API_KEY
@@ -22,6 +22,7 @@ from app.extraction import (
     validate_g28_file,
 )
 from app.form_filler import fill_form
+from app.preview_fill import build_fill_preview, normalize_merged_extracted
 
 app = FastAPI(title="Alma Document & Form Automation", version="0.1.0")
 
@@ -52,6 +53,17 @@ def check_api_key():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/preview-fill")
+def preview_fill(body: dict = Body(...)):
+    """
+    Return which form-mapped fields have non-empty values for the given merged extraction.
+
+    No browser and no Gemini calls; mirrors the label/value pairs Playwright would try to fill.
+    """
+    normalized = normalize_merged_extracted(body if isinstance(body, dict) else {})
+    return build_fill_preview(normalized)
 
 
 def _validation_error_response(validation_errors: dict) -> tuple[int, dict]:
