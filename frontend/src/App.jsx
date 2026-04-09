@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import './App.css'
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { API_BASE } from './config'
+import { createExtractionSession, formatApiError } from './api/extractionApi'
+import { ExtractionHistoryPanel } from './ExtractionHistoryPanel'
+import { FillPreviewModal } from './FillPreviewModal'
 
 const DEFAULT_FORM_URL = 'https://mendrika-alma.github.io/form-submission/'
 
@@ -12,6 +14,15 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+  const [historyRefresh, setHistoryRefresh] = useState(0)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [saveTitle, setSaveTitle] = useState('')
+  const [loadedSession, setLoadedSession] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  const bumpHistory = useCallback(() => {
+    setHistoryRefresh((n) => n + 1)
+  }, [])
 
   const buildFormData = (includeFormUrl = false) => {
     const form = new FormData()
@@ -21,24 +32,12 @@ function App() {
     return form
   }
 
-  const formatApiError = (err) => {
-    const d = err?.detail
-    if (typeof d === 'string') return d
-    if (d && typeof d === 'object' && d.validation_errors) {
-      const parts = []
-      if (d.validation_errors.passport) parts.push(`Passport: ${d.validation_errors.passport}`)
-      if (d.validation_errors.g28) parts.push(`G-28: ${d.validation_errors.g28}`)
-      if (parts.length) return `The uploaded document(s) are not valid. ${parts.join(' ')}`
-      return d.detail || 'Document validation failed. Please upload a valid passport and/or G-28 form.'
-    }
-    return (d && d.detail) || (typeof d === 'string' ? d : null) || JSON.stringify(err?.detail ?? err) || 'Request failed'
-  }
-
   const handleExtract = async () => {
     const form = buildFormData(false)
     if (form.get('passport') || form.get('g28')) {
       setError(null)
       setResult(null)
+      setLoadedSession(null)
       setLoading(true)
       try {
         const r = await fetch(`${API_BASE}/extract`, {
@@ -75,6 +74,7 @@ function App() {
     if (form.get('passport') || form.get('g28')) {
       setError(null)
       setResult(null)
+      setLoadedSession(null)
       setLoading(true)
       try {
         const r = await fetch(`${API_BASE}/fill-form`, {
@@ -103,76 +103,172 @@ function App() {
     }
   }
 
+  const handleSaveExtraction = async () => {
+    const extracted = result?.extracted
+    if (!extracted) {
+      setError('Run extract first to save data.')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await createExtractionSession({
+        extracted,
+        title: saveTitle.trim() || undefined,
+        passport_filename: passportFile?.name || undefined,
+        g28_filename: g28File?.name || undefined,
+        default_form_url: formUrl?.trim() || undefined,
+      })
+      setSaveTitle('')
+      bumpHistory()
+    } catch (e) {
+      setError(e.message || 'Save failed.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleLoadFromHistory = (extracted, meta) => {
+    setLoadedSession(meta)
+    setResult({
+      extracted,
+      filled_fields: null,
+      errors: null,
+    })
+    setError(null)
+    if (meta?.default_form_url) setFormUrl(meta.default_form_url)
+  }
+
+  const handleFillResultFromHistory = (data) => {
+    setResult({
+      extracted: data.extracted,
+      filled_fields: data.filled_fields,
+      errors: data.errors,
+      form_url: data.form_url,
+      opened_in_existing_browser: data.opened_in_existing_browser,
+    })
+    setLoadedSession((prev) => (data.session_id ? { id: data.session_id } : prev))
+    setError(null)
+  }
+
+  const previewExtracted = result?.extracted || null
+
   return (
     <div className="app">
       <header className="header">
         <h1>Document & Form Automation</h1>
-        <p>Upload passport and/or G-28 (PDF or image). Extract data and optionally fill the form.</p>
+        <p>Upload passport and/or G-28 (PDF or image). Extract data, preview mapped fields, save sessions, and fill the form.</p>
       </header>
 
-      <section className="upload">
-        <div className="field">
-          <label>Form URL (link to the form to fill)</label>
-          <input
-            type="url"
-            value={formUrl}
-            onChange={(e) => setFormUrl(e.target.value)}
-            placeholder="https://example.com/form"
-          />
-        </div>
-        <div className="field">
-          <label>Passport (PDF, JPEG, PNG)</label>
-          <input
-            type="file"
-            accept=".pdf,image/jpeg,image/png,image/jpg"
-            onChange={(e) => setPassportFile(e.target.files?.[0] || null)}
-          />
-        </div>
-        <div className="field">
-          <label>G-28 / Form A-28 (PDF, JPEG, PNG)</label>
-          <input
-            type="file"
-            accept=".pdf,image/jpeg,image/png,image/jpg"
-            onChange={(e) => setG28File(e.target.files?.[0] || null)}
-          />
-        </div>
-        <div className="actions">
-          <button onClick={handleExtract} disabled={loading}>
-            {loading ? 'Processing…' : 'Extract only'}
-          </button>
-          <button onClick={handleFillForm} disabled={loading} className="primary">
-            {loading ? 'Processing…' : 'Extract & fill form'}
-          </button>
-        </div>
-      </section>
+      <div className="app-layout">
+        <div className="app-main">
+          <section className="upload">
+            <div className="field">
+              <label>Form URL (link to the form to fill)</label>
+              <input
+                type="url"
+                value={formUrl}
+                onChange={(e) => setFormUrl(e.target.value)}
+                placeholder="https://example.com/form"
+              />
+            </div>
+            <div className="field">
+              <label>Passport (PDF, JPEG, PNG)</label>
+              <input
+                type="file"
+                accept=".pdf,image/jpeg,image/png,image/jpg"
+                onChange={(e) => setPassportFile(e.target.files?.[0] || null)}
+              />
+            </div>
+            <div className="field">
+              <label>G-28 / Form A-28 (PDF, JPEG, PNG)</label>
+              <input
+                type="file"
+                accept=".pdf,image/jpeg,image/png,image/jpg"
+                onChange={(e) => setG28File(e.target.files?.[0] || null)}
+              />
+            </div>
+            <div className="actions">
+              <button onClick={handleExtract} disabled={loading}>
+                {loading ? 'Processing…' : 'Extract only'}
+              </button>
+              <button onClick={handleFillForm} disabled={loading} className="primary">
+                {loading ? 'Processing…' : 'Extract & fill form'}
+              </button>
+            </div>
+          </section>
 
-      {error && (
-        <div className="message error">
-          {error}
-        </div>
-      )}
+          {error && <div className="message error">{error}</div>}
 
-      {result && (
-        <section className="result">
-          <h2>Result</h2>
-          {result.opened_in_existing_browser ? (
-            <p className="filled">Original form opened and filled in a Chrome tab. The tab remains open for you to review/edit.</p>
-          ) : (
-            <p className="warn">
-              Could not open/fill in your existing Chrome tab. Start Chrome with remote debugging first:
-              {' '}
-              <code>/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222</code>
-            </p>
+          {result && (
+            <section className="result">
+              <h2>Result</h2>
+              {loadedSession && (
+                <p className="session-banner">
+                  Loaded from saved session
+                  {loadedSession.title ? `: ${loadedSession.title}` : ''}.
+                </p>
+              )}
+              {result.opened_in_existing_browser != null && (
+                <>
+                  {result.opened_in_existing_browser ? (
+                    <p className="filled">
+                      Original form opened and filled in a Chrome tab. The tab remains open for you to review/edit.
+                    </p>
+                  ) : (
+                    <p className="warn">
+                      Could not open/fill in your existing Chrome tab. Start Chrome with remote debugging first:{' '}
+                      <code>
+                        /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+                      </code>
+                    </p>
+                  )}
+                </>
+              )}
+              {result.filled_fields?.length > 0 && (
+                <p className="filled">Filled fields: {result.filled_fields.join(', ')}</p>
+              )}
+              {result.errors?.length > 0 && <p className="warn">Warnings: {result.errors.join('; ')}</p>}
+              <div className="result-toolbar">
+                <button type="button" onClick={() => setPreviewOpen(true)} disabled={!previewExtracted}>
+                  Preview fill mapping
+                </button>
+                <div className="save-row">
+                  <input
+                    type="text"
+                    placeholder="Optional title for save"
+                    value={saveTitle}
+                    onChange={(e) => setSaveTitle(e.target.value)}
+                    aria-label="Session title"
+                  />
+                  <button type="button" onClick={handleSaveExtraction} disabled={saving || !previewExtracted}>
+                    {saving ? 'Saving…' : 'Save extraction'}
+                  </button>
+                </div>
+              </div>
+              <pre className="json">{JSON.stringify(result.extracted, null, 2)}</pre>
+            </section>
           )}
-          {result.filled_fields?.length > 0 && (
-            <p className="filled">Filled fields: {result.filled_fields.join(', ')}</p>
-          )}
-          {result.errors?.length > 0 && (
-            <p className="warn">Warnings: {result.errors.join('; ')}</p>
-          )}
-          <pre className="json">{JSON.stringify(result.extracted, null, 2)}</pre>
-        </section>
-      )}
+        </div>
+
+        <aside className="app-aside">
+          <ExtractionHistoryPanel
+            refreshToken={historyRefresh}
+            formUrl={formUrl}
+            onLoadExtracted={handleLoadFromHistory}
+            onFillResult={handleFillResultFromHistory}
+            onError={setError}
+            onBusy={setLoading}
+          />
+        </aside>
+      </div>
+
+      <FillPreviewModal
+        open={previewOpen}
+        extracted={previewExtracted}
+        onClose={() => setPreviewOpen(false)}
+        onError={setError}
+      />
     </div>
   )
 }

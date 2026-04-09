@@ -1,8 +1,29 @@
 .app {
-  max-width: 720px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 2rem;
   font-family: system-ui, -apple-system, sans-serif;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.app-main {
+  min-width: 0;
+}
+
+.app-aside {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .header {
@@ -132,4 +153,67 @@
 
 .result a {
   color: #0d6efd;
+}
+
+.session-banner {
+  background: #e7f1ff;
+  border: 1px solid #b6d4fe;
+  color: #084298;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.result-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.result-toolbar > button {
+  align-self: flex-start;
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid #ced4da;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.result-toolbar > button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.save-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.save-row input[type='text'] {
+  flex: 1;
+  min-width: 160px;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #ced4da;
+  font-size: 0.88rem;
+}
+
+.save-row button {
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid #198754;
+  background: #198754;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.save-row button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
