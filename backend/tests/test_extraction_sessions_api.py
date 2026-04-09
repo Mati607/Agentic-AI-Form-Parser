@@ -40,7 +40,10 @@ def test_create_and_get_session(session_client):
     }
     c = session_client.post("/extraction-sessions", json=body)
     assert c.status_code == 201
-    sid = c.json()["id"]
+    created = c.json()
+    assert "readiness" in created
+    assert "score" in created["readiness"]
+    sid = created["id"]
     g = session_client.get(f"/extraction-sessions/{sid}")
     assert g.status_code == 200
     assert g.json()["title"] == "My run"

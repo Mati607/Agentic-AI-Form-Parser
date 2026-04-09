@@ -64,6 +64,19 @@ def test_update_metadata(repo_db):
     assert repo.update_session_metadata("deadbeef" * 2, title="x") is False
 
 
+def test_create_with_quality_snapshot(repo_db):
+    sid = repo.create_session(
+        {"passport": {"first_name": "A"}, "attorney": {}},
+        quality_snapshot={"schema_version": 1, "score": 77, "grade": "C", "findings": []},
+    )
+    d = repo.get_session(sid)
+    assert d is not None
+    assert d.get("readiness", {}).get("score") == 77
+    items, _ = repo.list_sessions(limit=5, offset=0)
+    assert items[0]["readiness_score"] == 77
+    assert items[0]["readiness_grade"] == "C"
+
+
 def test_list_pagination(repo_db):
     for i in range(5):
         repo.create_session({"passport": {"n": i}, "attorney": {}}, title=f"S{i}")
