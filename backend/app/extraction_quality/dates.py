@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime, timezone
-from typing import Iterable
 
 
 def _strip_noise(s: str) -> str:
