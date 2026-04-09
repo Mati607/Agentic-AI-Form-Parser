@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import './App.css'
 import { API_BASE } from './config'
-import { createExtractionSession, formatApiError } from './api/extractionApi'
+import { createExtractionSession, fetchExtractionReadiness, formatApiError } from './api/extractionApi'
 import { ExtractionHistoryPanel } from './ExtractionHistoryPanel'
 import { FillPreviewModal } from './FillPreviewModal'
+import { ReadinessReportPanel } from './ReadinessReportPanel'
 
 const DEFAULT_FORM_URL = 'https://mendrika-alma.github.io/form-submission/'
 
@@ -19,6 +20,7 @@ function App() {
   const [saveTitle, setSaveTitle] = useState('')
   const [loadedSession, setLoadedSession] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [readinessReport, setReadinessReport] = useState(null)
 
   const bumpHistory = useCallback(() => {
     setHistoryRefresh((n) => n + 1)
@@ -31,6 +33,25 @@ function App() {
     if (g28File) form.append('g28', g28File)
     return form
   }
+
+  useEffect(() => {
+    const extracted = result?.extracted
+    if (!extracted) {
+      setReadinessReport(null)
+      return
+    }
+    let cancelled = false
+    fetchExtractionReadiness(extracted)
+      .then((rep) => {
+        if (!cancelled) setReadinessReport(rep)
+      })
+      .catch(() => {
+        if (!cancelled) setReadinessReport(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [result?.extracted])
 
   const handleExtract = async () => {
     const form = buildFormData(false)
@@ -112,13 +133,14 @@ function App() {
     setSaving(true)
     setError(null)
     try {
-      await createExtractionSession({
+      const saved = await createExtractionSession({
         extracted,
         title: saveTitle.trim() || undefined,
         passport_filename: passportFile?.name || undefined,
         g28_filename: g28File?.name || undefined,
         default_form_url: formUrl?.trim() || undefined,
       })
+      if (saved?.readiness) setReadinessReport(saved.readiness)
       setSaveTitle('')
       bumpHistory()
     } catch (e) {
@@ -137,6 +159,7 @@ function App() {
     })
     setError(null)
     if (meta?.default_form_url) setFormUrl(meta.default_form_url)
+    if (meta?.readiness) setReadinessReport(meta.readiness)
   }
 
   const handleFillResultFromHistory = (data) => {
@@ -157,7 +180,10 @@ function App() {
     <div className="app">
       <header className="header">
         <h1>Document & Form Automation</h1>
-        <p>Upload passport and/or G-28 (PDF or image). Extract data, preview mapped fields, save sessions, and fill the form.</p>
+        <p>
+          Upload passport and/or G-28 (PDF or image). Extract data, review readiness, preview mapped fields, save sessions,
+          and fill the form.
+        </p>
       </header>
 
       <div className="app-layout">
@@ -229,6 +255,7 @@ function App() {
                 <p className="filled">Filled fields: {result.filled_fields.join(', ')}</p>
               )}
               {result.errors?.length > 0 && <p className="warn">Warnings: {result.errors.join('; ')}</p>}
+              <ReadinessReportPanel report={readinessReport} />
               <div className="result-toolbar">
                 <button type="button" onClick={() => setPreviewOpen(true)} disabled={!previewExtracted}>
                   Preview fill mapping

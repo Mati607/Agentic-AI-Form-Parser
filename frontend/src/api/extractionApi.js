@@ -27,6 +27,15 @@ async function parseJsonOrThrow(res) {
   throw new Error(formatApiError(err))
 }
 
+export async function fetchExtractionReadiness(extracted) {
+  const res = await fetch(`${API_BASE}/extraction-readiness`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(extracted),
+  })
+  return parseJsonOrThrow(res)
+}
+
 export async function previewFill(extracted) {
   const res = await fetch(`${API_BASE}/preview-fill`, {
     method: 'POST',

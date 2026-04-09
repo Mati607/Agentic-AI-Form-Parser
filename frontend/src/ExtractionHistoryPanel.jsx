@@ -68,6 +68,7 @@ export function ExtractionHistoryPanel({
         id: row.id,
         title: row.title,
         default_form_url: row.default_form_url,
+        readiness: row.readiness,
       })
     } catch (e) {
       onError?.(e.message || 'Failed to load session.')
@@ -140,6 +141,9 @@ export function ExtractionHistoryPanel({
               </div>
               <div className="history-meta">
                 P:{row.field_counts?.passport ?? 0} · A:{row.field_counts?.attorney ?? 0}
+                {row.readiness_grade != null && row.readiness_score != null
+                  ? ` · readiness ${row.readiness_grade} (${row.readiness_score})`
+                  : ''}
                 {row.has_last_fill ? ' · last fill saved' : ''}
               </div>
               <div className="history-actions">
