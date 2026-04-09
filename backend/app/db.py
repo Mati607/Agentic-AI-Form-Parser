@@ -11,8 +11,6 @@ from typing import Generator
 
 from app.config import EXTRACTION_DB_PATH
 
-SCHEMA_VERSION = 1
-
 CREATE_STATEMENTS = [
     """
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -71,11 +69,21 @@ def get_connection() -> Generator[sqlite3.Connection, None, None]:
         conn.close()
 
 
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    """Apply incremental SQLite migrations; safe to call on every startup."""
+    applied = {int(r["version"]) for r in conn.execute("SELECT version FROM schema_migrations").fetchall()}
+    if 1 not in applied:
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (1)")
+    if 2 not in applied:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(extraction_sessions)").fetchall()]
+        if "quality_json" not in cols:
+            conn.execute("ALTER TABLE extraction_sessions ADD COLUMN quality_json TEXT")
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (2)")
+
+
 def init_db() -> None:
-    """Create database file, tables, and indexes if they do not exist."""
+    """Create database file, tables, indexes, and run migrations."""
     with get_connection() as conn:
         for stmt in CREATE_STATEMENTS:
             conn.execute(stmt)
-        row = conn.execute("SELECT version FROM schema_migrations WHERE version = ?", (SCHEMA_VERSION,)).fetchone()
-        if row is None:
-            conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (SCHEMA_VERSION,))
+        _run_migrations(conn)
