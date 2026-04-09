@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .env
 
+# Local SQLite DB for saved extraction sessions
+backend/data/*.db
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
