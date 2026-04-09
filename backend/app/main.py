@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -21,10 +22,23 @@ from app.extraction import (
     validate_passport_file,
     validate_g28_file,
 )
+from app.db import init_db
 from app.form_filler import fill_form
 from app.preview_fill import build_fill_preview, normalize_merged_extracted
+from app.routers import extraction_sessions
 
-app = FastAPI(title="Alma Document & Form Automation", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(
+    title="Alma Document & Form Automation",
+    version="0.1.0",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +46,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.include_router(
+    extraction_sessions.router,
+    prefix="/extraction-sessions",
+    tags=["extraction-sessions"],
 )
 
 ALLOWED_TYPES = {
