@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from starlette.responses import Response
 
+from app.extraction_quality import build_readiness_report
 from app.form_filler import fill_form
 from app.preview_fill import normalize_merged_extracted
 from app import session_repository as session_repo
@@ -30,9 +31,10 @@ def _as_merged_dict(extracted: Any) -> dict[str, Any]:
 
 
 @router.post("", status_code=201)
-def create_extraction_session(payload: CreateExtractionSessionRequest) -> dict[str, str]:
+def create_extraction_session(payload: CreateExtractionSessionRequest) -> dict[str, Any]:
     merged = _as_merged_dict(payload.extracted)
     normalized = normalize_merged_extracted(merged)
+    readiness = build_readiness_report(normalized)
     sid = session_repo.create_session(
         normalized,
         title=payload.title,
@@ -40,8 +42,9 @@ def create_extraction_session(payload: CreateExtractionSessionRequest) -> dict[s
         g28_filename=payload.g28_filename,
         default_form_url=payload.default_form_url,
         notes=payload.notes,
+        quality_snapshot=readiness,
     )
-    return {"id": sid}
+    return {"id": sid, "readiness": readiness}
 
 
 @router.get("", response_model=ExtractionSessionListResponse)
@@ -98,6 +101,7 @@ def export_extraction_session(session_id: str) -> Response:
         "notes": row["notes"],
         "extracted": row.get("extracted"),
         "last_fill": row.get("last_fill"),
+        "readiness": row.get("readiness"),
     }
     body = json.dumps(export_obj, ensure_ascii=False, indent=2)
     filename = f"extraction-session-{session_id[:8]}.json"

@@ -16,6 +16,16 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _parse_quality_blob(raw: Any) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    try:
+        q = json.loads(raw)
+        return q if isinstance(q, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
 def _row_to_summary(row: Any) -> dict[str, Any]:
     """Lightweight dict for list endpoints."""
     extracted: dict[str, Any] = {}
@@ -27,7 +37,8 @@ def _row_to_summary(row: Any) -> dict[str, Any]:
     a = extracted.get("attorney")
     passport_n = len(p) if isinstance(p, dict) else 0
     attorney_n = len(a) if isinstance(a, dict) else 0
-    return {
+    quality = _parse_quality_blob(row["quality_json"])
+    out: dict[str, Any] = {
         "id": row["id"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
@@ -38,6 +49,10 @@ def _row_to_summary(row: Any) -> dict[str, Any]:
         "field_counts": {"passport": passport_n, "attorney": attorney_n},
         "has_last_fill": bool(row["last_fill_json"]),
     }
+    if quality:
+        out["readiness_score"] = quality.get("score")
+        out["readiness_grade"] = quality.get("grade")
+    return out
 
 
 def _row_to_detail(row: Any) -> dict[str, Any]:
@@ -52,12 +67,16 @@ def _row_to_detail(row: Any) -> dict[str, Any]:
             last_fill = json.loads(row["last_fill_json"])
         except json.JSONDecodeError:
             last_fill = None
-    return {
+    quality = _parse_quality_blob(row["quality_json"])
+    detail = {
         **summary,
         "extracted": extracted,
         "last_fill": last_fill,
         "notes": row["notes"],
     }
+    if quality is not None:
+        detail["readiness"] = quality
+    return detail
 
 
 def create_session(
@@ -68,18 +87,20 @@ def create_session(
     g28_filename: str | None = None,
     default_form_url: str | None = None,
     notes: str | None = None,
+    quality_snapshot: dict[str, Any] | None = None,
 ) -> str:
     """Insert a new session; returns generated id (UUID hex)."""
     sid = uuid.uuid4().hex
     now = _utc_now_iso()
     payload = json.dumps(extracted, ensure_ascii=False)
+    qblob = json.dumps(quality_snapshot, ensure_ascii=False) if quality_snapshot is not None else None
     with get_connection() as conn:
         conn.execute(
             """
             INSERT INTO extraction_sessions (
               id, created_at, updated_at, title, passport_filename, g28_filename,
-              default_form_url, extracted_json, last_fill_json, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+              default_form_url, extracted_json, last_fill_json, notes, quality_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
             """,
             (
                 sid,
@@ -91,6 +112,7 @@ def create_session(
                 default_form_url,
                 payload,
                 notes,
+                qblob,
             ),
         )
     return sid
@@ -105,7 +127,7 @@ def list_sessions(limit: int = 50, offset: int = 0) -> tuple[list[dict[str, Any]
         rows = conn.execute(
             """
             SELECT id, created_at, updated_at, title, passport_filename, g28_filename,
-                   default_form_url, extracted_json, last_fill_json, notes
+                   default_form_url, extracted_json, last_fill_json, notes, quality_json
             FROM extraction_sessions
             ORDER BY datetime(created_at) DESC
             LIMIT ? OFFSET ?
@@ -120,7 +142,7 @@ def get_session(session_id: str) -> dict[str, Any] | None:
         row = conn.execute(
             """
             SELECT id, created_at, updated_at, title, passport_filename, g28_filename,
-                   default_form_url, extracted_json, last_fill_json, notes
+                   default_form_url, extracted_json, last_fill_json, notes, quality_json
             FROM extraction_sessions WHERE id = ?
             """,
             (session_id,),
