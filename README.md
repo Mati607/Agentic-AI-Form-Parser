@@ -43,7 +43,7 @@ Open **http://localhost:5173**. Upload passport and/or G-28, then use **Extract 
 
 ## Tests
 
-Backend unit tests use **pytest** with mocked extraction and form-filling so no API key or browser is required. They cover the FastAPI routes: health, extract (validation, content-type, missing key), and fill (with stubbed Playwright).
+Backend unit tests use **pytest** with mocked extraction and form-filling so no API key or browser is required. They cover the FastAPI routes: health, extract (validation, content-type, missing key), fill (with stubbed Playwright), preview/readiness, and extraction sessions.
 
 From the backend directory:
 
@@ -62,6 +62,7 @@ Use `-v` for verbose output or `-k "test_name"` to run a subset of tests.
 - **Data extraction** — BAML + Gemini read passport and G-28 images (PDFs are converted to images). All fields are optional so missing or unclear data does not break the pipeline.
 - **Form filling** — Playwright opens the target form and fills fields by matching labels (with fallbacks for placeholder and name). Only non-empty extracted values are written; the form is not submitted.
 - **Fill preview** — `POST /preview-fill` returns which mapped fields have values (same mapping Playwright uses). No browser or Gemini call.
+- **Extraction readiness** — `POST /extraction-readiness` runs rule-based checks (missing core fields, passport expiry, attorney contact hints, etc.) and returns a score, letter grade, and findings. No LLM call. Saving a session stores this snapshot in SQLite (`quality_json`) and returns it from `POST /extraction-sessions`; the UI shows the report after extract/load.
 - **Saved extraction sessions** — Merged extraction JSON can be stored in SQLite (`POST /extraction-sessions`), listed, exported, deleted, and used to run `POST /extraction-sessions/{id}/fill-form` without re-uploading files. The React app includes a sidebar for these sessions.
 
 ---
