@@ -24,6 +24,7 @@ from app.extraction import (
 )
 from app.db import init_db
 from app.form_filler import fill_form
+from app.extraction_quality import build_readiness_report
 from app.preview_fill import build_fill_preview, normalize_merged_extracted
 from app.routers import extraction_sessions
 
@@ -84,6 +85,17 @@ def preview_fill(body: dict = Body(...)):
     """
     normalized = normalize_merged_extracted(body if isinstance(body, dict) else {})
     return build_fill_preview(normalized)
+
+
+@app.post("/extraction-readiness")
+def extraction_readiness(body: dict = Body(...)):
+    """
+    Rule-based readiness report for a merged extraction (passport + attorney).
+
+    No LLM calls: scores completeness and flags likely data issues (e.g. expired passport).
+    """
+    normalized = normalize_merged_extracted(body if isinstance(body, dict) else {})
+    return build_readiness_report(normalized)
 
 
 def _validation_error_response(validation_errors: dict) -> tuple[int, dict]:
