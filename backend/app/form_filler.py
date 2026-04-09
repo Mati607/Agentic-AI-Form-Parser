@@ -8,38 +8,7 @@ from app.config import (
     CHROME_CDP_PORT,
     CHROME_CDP_PROFILE_DIR,
 )
-
-FIELD_MAPPINGS = [
-    # Part 1 - Attorney
-    ("attorney", "online_account_number", ["Online Account Number", "1. Online Account Number"]),
-    ("attorney", "family_name", ["2.a. Family Name", "Family Name (Last Name)"]),
-    ("attorney", "given_name", ["2.b. Given Name", "Given Name (First Name)"]),
-    ("attorney", "middle_name", ["2.c. Middle Name", "Middle Name"]),
-    ("attorney", "street_number_and_name", ["3.a. Street Number and Name", "Street Number and Name"]),
-    ("attorney", "apt_ste_flr", ["Apt. Ste. Flr.", "Apt"]),
-    ("attorney", "city", ["3.c. City", "City"]),
-    ("attorney", "state", ["3.d. State", "State"]),
-    ("attorney", "zip_code", ["3.e. ZIP Code", "ZIP Code"]),
-    ("attorney", "country", ["3.f. Country", "Country"]),
-    ("attorney", "daytime_telephone", ["4. Daytime Telephone Number", "Daytime Telephone"]),
-    ("attorney", "mobile_telephone", ["5. Mobile Telephone Number", "Mobile Telephone"]),
-    ("attorney", "email", ["6. Email Address", "Email Address"]),
-    ("attorney", "licensing_authority", ["Licensing Authority"]),
-    ("attorney", "bar_number", ["1.b. Bar Number", "Bar Number"]),
-    ("attorney", "law_firm_or_organization", ["1.d. Name of Law Firm or Organization", "Law Firm"]),
-    # Part 3 - Passport (beneficiary)
-    ("passport", "last_name", ["1.a. Last Name", "Last Name"]),
-    ("passport", "first_name", ["1.b. First Name(s)", "First Name"]),
-    ("passport", "middle_name", ["1.c. Middle Name(s)", "Middle Name(s)"]),
-    ("passport", "passport_number", ["2. Passport Number", "Passport Number"]),
-    ("passport", "country_of_issue", ["3. Country of Issue", "Country of Issue"]),
-    ("passport", "nationality", ["4. Nationality", "Nationality"]),
-    ("passport", "date_of_birth", ["5.a. Date of Birth", "Date of Birth"]),
-    ("passport", "place_of_birth", ["5.b. Place of Birth", "Place of Birth"]),
-    ("passport", "sex", ["6. Sex", "Sex"]),
-    ("passport", "date_of_issue", ["7.a. Date of Issue", "Date of Issue"]),
-    ("passport", "date_of_expiration", ["7.b. Date of Expiration", "Date of Expiration"]),
-]
+from app.field_mappings import FIELD_MAPPINGS, get_mapped_value
 
 
 async def _fill_field(page: Page, value: str, labels: list[str], select_if_select: bool = True) -> bool:
@@ -130,9 +99,7 @@ async def fill_form(extracted: dict, form_url: str | None = None) -> dict:
             await page.goto(url, wait_until="networkidle", timeout=30000)
 
             for section, key, labels in FIELD_MAPPINGS:
-                value = (extracted.get(section) or {}).get(key)
-                if value is None:
-                    value = (extracted.get(section) or {}).get(key.replace("_", " ").title())
+                value = get_mapped_value(extracted, section, key)
                 if not value:
                     continue
                 try:
