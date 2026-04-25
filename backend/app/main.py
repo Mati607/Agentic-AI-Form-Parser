@@ -14,7 +14,7 @@ except ImportError:
 from fastapi import Body, FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import GOOGLE_API_KEY
+from app.config import ALLOWED_ORIGINS, GOOGLE_API_KEY
 from app.extraction import (
     extract_from_passport_file,
     extract_from_g28_file,
@@ -28,11 +28,14 @@ from app.extraction_quality import build_readiness_report
 from app.preview_fill import build_fill_preview, normalize_merged_extracted
 from app.demo_samples import sample_merged_extraction
 from app.routers import extraction_sessions
+from app.intake.router import router as intake_router
+from app.intake.retention import sweep_intake_retention
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    sweep_intake_retention()
     yield
 
 
@@ -42,9 +45,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_default_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+_extra = [o.strip() for o in (ALLOWED_ORIGINS or "").split(",") if o.strip()]
+_cors_origins = list(dict.fromkeys(_default_origins + _extra))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,6 +62,7 @@ app.include_router(
     prefix="/extraction-sessions",
     tags=["extraction-sessions"],
 )
+app.include_router(intake_router, prefix="/intake", tags=["intake"])
 
 ALLOWED_TYPES = {
     "application/pdf",

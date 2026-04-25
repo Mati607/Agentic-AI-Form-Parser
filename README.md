@@ -66,6 +66,8 @@ Use `-v` for verbose output or `-k "test_name"` to run a subset of tests.
 - **Saved extraction sessions** — Merged extraction JSON can be stored in SQLite (`POST /extraction-sessions`), listed, exported, deleted, and used to run `POST /extraction-sessions/{id}/fill-form` without re-uploading files. The React app includes a sidebar for these sessions.
 - **Demo mode (no API keys)** — `GET /demo/sample-extraction` and `POST /demo/sample-session` generate realistic sample data locally (no LLM calls) so you can show the full UX without credentials.
 - **Shareable readiness report** — `GET /extraction-sessions/{id}/readiness.md` exports a one-page Markdown scorecard for demos and reviews.
+- **Intake pipeline (legal identity workflow)** — `POST /intake/jobs` accepts passport and/or G-28, stores originals under `INTAKE_STORAGE_DIR`, validates, renders page images for review, extracts via BAML, writes **field assertions** (with provenance) and an **append-only audit log**. `PATCH /intake/jobs/{id}/fields` records human overrides without silently clobbering them on re-ingest. `POST /intake/jobs/{id}/promote-to-session` copies the merged result into the existing saved-session store with a readiness snapshot. The React app exposes **Intake & review (pipeline)** next to the classic flow.
+- **Retention** — On startup, jobs older than `INTAKE_RETENTION_DAYS` are deleted from SQLite and their files removed from disk.
 
 ---
 
@@ -77,6 +79,10 @@ Use `-v` for verbose output or `-k "test_name"` to run a subset of tests.
 | `FORM_URL` | Form URL to fill. Default: `https://mendrika-alma.github.io/form-submission/` |
 | `HEADLESS` | Set to `false` to show the browser when filling the form. |
 | `EXTRACTION_DB_PATH` | Optional. Path to the SQLite file for saved sessions. Default: `backend/data/extraction_sessions.db` (created on startup). |
+| `INTAKE_STORAGE_DIR` | Optional. Directory for intake originals and rendered page images. Default: `backend/data/intake`. |
+| `INTAKE_RETENTION_DAYS` | Optional. Delete intake jobs older than this many days on startup (`0` disables). Default: `30`. |
+| `INTAKE_SIGNING_SECRET` | **Recommended in production.** HMAC secret for short-lived signed URLs to download page images (`GET /intake/jobs/.../artifacts/.../file`). |
+| `ALLOWED_ORIGINS` | Optional. Comma-separated extra CORS origins (localhost Vite origins are always allowed). |
 
 ---
 

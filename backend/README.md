@@ -26,3 +26,9 @@ poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `GET /demo/sample-extraction?variant=good|messy` – local sample payload + readiness + preview (no API keys)
 - `POST /demo/sample-session?variant=good|messy` – create a stored demo session (no API keys)
 - `GET /extraction-sessions/{id}/readiness.md` – export readiness scorecard as Markdown
+- `POST /intake/jobs` – multipart `passport` / `g28`; creates job, stores files, runs pipeline in background
+- `GET /intake/jobs/{id}` – job status, audit tail, artifact list, signed `page_image_links` for review UI
+- `GET /intake/jobs/{id}/fields` – field assertions (values + `baml` vs `human_override`)
+- `PATCH /intake/jobs/{id}/fields` – body `{ "patches": [{ "field_path", "value", "reviewer_note?" }] }`
+- `GET /intake/jobs/{id}/artifacts/{artifact_id}/file?exp=&sig=` – signed download for rendered pages / originals
+- `POST /intake/jobs/{id}/promote-to-session` – create `extraction_sessions` row from current assertions + readiness

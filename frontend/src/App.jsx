@@ -5,6 +5,7 @@ import { createExtractionSession, fetchExtractionReadiness, formatApiError } fro
 import { ExtractionHistoryPanel } from './ExtractionHistoryPanel'
 import { FillPreviewModal } from './FillPreviewModal'
 import { ReadinessReportPanel } from './ReadinessReportPanel'
+import { IntakeView } from './intake/IntakeView'
 
 const DEFAULT_FORM_URL = 'https://mendrika-alma.github.io/form-submission/'
 
@@ -21,6 +22,7 @@ function App() {
   const [loadedSession, setLoadedSession] = useState(null)
   const [saving, setSaving] = useState(false)
   const [readinessReport, setReadinessReport] = useState(null)
+  const [appMode, setAppMode] = useState('classic')
 
   const bumpHistory = useCallback(() => {
     setHistoryRefresh((n) => n + 1)
@@ -179,102 +181,132 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Document & Form Automation</h1>
+        <h1>FormPilot — Document &amp; form automation</h1>
         <p>
-          Upload passport and/or G-28 (PDF or image). Extract data, review readiness, preview mapped fields, save sessions,
-          and fill the form.
+          Upload passport and/or G-28 (PDF or image). Extract data, review readiness, preview mapped fields, save
+          sessions, and fill the form.
         </p>
+        <div className="field checkbox" style={{ marginTop: '0.75rem' }}>
+          <label>
+            <input type="radio" name="appMode" checked={appMode === 'classic'} onChange={() => setAppMode('classic')} />
+            Classic extract &amp; fill
+          </label>
+          <label style={{ marginLeft: '1rem' }}>
+            <input type="radio" name="appMode" checked={appMode === 'intake'} onChange={() => setAppMode('intake')} />
+            Intake &amp; review (pipeline)
+          </label>
+        </div>
       </header>
+
+      {error && <div className="message error">{error}</div>}
 
       <div className="app-layout">
         <div className="app-main">
-          <section className="upload">
-            <div className="field">
-              <label>Form URL (link to the form to fill)</label>
-              <input
-                type="url"
-                value={formUrl}
-                onChange={(e) => setFormUrl(e.target.value)}
-                placeholder="https://example.com/form"
-              />
-            </div>
-            <div className="field">
-              <label>Passport (PDF, JPEG, PNG)</label>
-              <input
-                type="file"
-                accept=".pdf,image/jpeg,image/png,image/jpg"
-                onChange={(e) => setPassportFile(e.target.files?.[0] || null)}
-              />
-            </div>
-            <div className="field">
-              <label>G-28 / Form A-28 (PDF, JPEG, PNG)</label>
-              <input
-                type="file"
-                accept=".pdf,image/jpeg,image/png,image/jpg"
-                onChange={(e) => setG28File(e.target.files?.[0] || null)}
-              />
-            </div>
-            <div className="actions">
-              <button onClick={handleExtract} disabled={loading}>
-                {loading ? 'Processing…' : 'Extract only'}
-              </button>
-              <button onClick={handleFillForm} disabled={loading} className="primary">
-                {loading ? 'Processing…' : 'Extract & fill form'}
-              </button>
-            </div>
-          </section>
-
-          {error && <div className="message error">{error}</div>}
-
-          {result && (
-            <section className="result">
-              <h2>Result</h2>
-              {loadedSession && (
-                <p className="session-banner">
-                  Loaded from saved session
-                  {loadedSession.title ? `: ${loadedSession.title}` : ''}.
-                </p>
-              )}
-              {result.opened_in_existing_browser != null && (
-                <>
-                  {result.opened_in_existing_browser ? (
-                    <p className="filled">
-                      Original form opened and filled in a Chrome tab. The tab remains open for you to review/edit.
-                    </p>
-                  ) : (
-                    <p className="warn">
-                      Could not open/fill in your existing Chrome tab. Start Chrome with remote debugging first:{' '}
-                      <code>
-                        /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
-                      </code>
-                    </p>
-                  )}
-                </>
-              )}
-              {result.filled_fields?.length > 0 && (
-                <p className="filled">Filled fields: {result.filled_fields.join(', ')}</p>
-              )}
-              {result.errors?.length > 0 && <p className="warn">Warnings: {result.errors.join('; ')}</p>}
-              <ReadinessReportPanel report={readinessReport} />
-              <div className="result-toolbar">
-                <button type="button" onClick={() => setPreviewOpen(true)} disabled={!previewExtracted}>
-                  Preview fill mapping
-                </button>
-                <div className="save-row">
+          {appMode === 'intake' ? (
+            <IntakeView
+              onError={setError}
+              onBusy={setLoading}
+              onPromoted={() => {
+                setError(null)
+                bumpHistory()
+              }}
+            />
+          ) : (
+            <>
+              <section className="upload">
+                <div className="field">
+                  <label>Form URL (link to the form to fill)</label>
                   <input
-                    type="text"
-                    placeholder="Optional title for save"
-                    value={saveTitle}
-                    onChange={(e) => setSaveTitle(e.target.value)}
-                    aria-label="Session title"
+                    type="url"
+                    value={formUrl}
+                    onChange={(e) => setFormUrl(e.target.value)}
+                    placeholder="https://example.com/form"
                   />
-                  <button type="button" onClick={handleSaveExtraction} disabled={saving || !previewExtracted}>
-                    {saving ? 'Saving…' : 'Save extraction'}
+                </div>
+                <div className="field">
+                  <label>Passport (PDF, JPEG, PNG)</label>
+                  <input
+                    type="file"
+                    accept=".pdf,image/jpeg,image/png,image/jpg"
+                    onChange={(e) => setPassportFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+                <div className="field">
+                  <label>G-28 / Form A-28 (PDF, JPEG, PNG)</label>
+                  <input
+                    type="file"
+                    accept=".pdf,image/jpeg,image/png,image/jpg"
+                    onChange={(e) => setG28File(e.target.files?.[0] || null)}
+                  />
+                </div>
+                <div className="actions">
+                  <button onClick={handleExtract} disabled={loading}>
+                    {loading ? 'Processing…' : 'Extract only'}
+                  </button>
+                  <button onClick={handleFillForm} disabled={loading} className="primary">
+                    {loading ? 'Processing…' : 'Extract & fill form'}
                   </button>
                 </div>
-              </div>
-              <pre className="json">{JSON.stringify(result.extracted, null, 2)}</pre>
-            </section>
+              </section>
+
+              {result && (
+                <section className="result">
+                  <h2>Result</h2>
+                  {loadedSession && (
+                    <p className="session-banner">
+                      Loaded from saved session
+                      {loadedSession.title ? `: ${loadedSession.title}` : ''}.
+                    </p>
+                  )}
+                  {result.opened_in_existing_browser != null && (
+                    <>
+                      {result.opened_in_existing_browser ? (
+                        <p className="filled">
+                          Original form opened and filled in a Chrome tab. The tab remains open for you to review/edit.
+                        </p>
+                      ) : (
+                        <p className="warn">
+                          Could not open/fill in your existing Chrome tab. Start Chrome with remote debugging first:{' '}
+                          <code>
+                            /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+                          </code>
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {result.filled_fields?.length > 0 && (
+                    <p className="filled">Filled fields: {result.filled_fields.join(', ')}</p>
+                  )}
+                  {result.errors?.length > 0 && <p className="warn">Warnings: {result.errors.join('; ')}</p>}
+                  <ReadinessReportPanel report={readinessReport} />
+                  <div className="result-toolbar">
+                    <button type="button" onClick={() => setPreviewOpen(true)} disabled={!previewExtracted}>
+                      Preview fill mapping
+                    </button>
+                    <div className="save-row">
+                      <input
+                        type="text"
+                        placeholder="Optional title for save"
+                        value={saveTitle}
+                        onChange={(e) => setSaveTitle(e.target.value)}
+                        aria-label="Session title"
+                      />
+                      <button type="button" onClick={handleSaveExtraction} disabled={saving || !previewExtracted}>
+                        {saving ? 'Saving…' : 'Save extraction'}
+                      </button>
+                    </div>
+                  </div>
+                  <pre className="json">{JSON.stringify(result.extracted, null, 2)}</pre>
+                </section>
+              )}
+
+              <FillPreviewModal
+                open={previewOpen}
+                extracted={previewExtracted}
+                onClose={() => setPreviewOpen(false)}
+                onError={setError}
+              />
+            </>
           )}
         </div>
 
@@ -289,13 +321,6 @@ function App() {
           />
         </aside>
       </div>
-
-      <FillPreviewModal
-        open={previewOpen}
-        extracted={previewExtracted}
-        onClose={() => setPreviewOpen(false)}
-        onError={setError}
-      />
     </div>
   )
 }

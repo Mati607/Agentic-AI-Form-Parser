@@ -79,6 +79,69 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         if "quality_json" not in cols:
             conn.execute("ALTER TABLE extraction_sessions ADD COLUMN quality_json TEXT")
         conn.execute("INSERT INTO schema_migrations (version) VALUES (2)")
+    if 3 not in applied:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS intake_jobs (
+              id TEXT PRIMARY KEY,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              status TEXT NOT NULL,
+              stage TEXT NOT NULL DEFAULT '',
+              error_message TEXT,
+              passport_filename TEXT,
+              g28_filename TEXT,
+              passport_sha256 TEXT,
+              g28_sha256 TEXT,
+              retention_days INTEGER NOT NULL DEFAULT 30,
+              result_json TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_intake_jobs_created_at
+              ON intake_jobs (created_at);
+
+            CREATE TABLE IF NOT EXISTS intake_artifacts (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              job_id TEXT NOT NULL,
+              kind TEXT NOT NULL,
+              role TEXT NOT NULL,
+              page_index INTEGER,
+              rel_path TEXT NOT NULL,
+              content_type TEXT NOT NULL,
+              byte_size INTEGER NOT NULL,
+              sha256 TEXT NOT NULL,
+              FOREIGN KEY (job_id) REFERENCES intake_jobs(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_intake_artifacts_job
+              ON intake_artifacts (job_id);
+
+            CREATE TABLE IF NOT EXISTS intake_field_assertions (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              job_id TEXT NOT NULL,
+              field_path TEXT NOT NULL,
+              value_json TEXT NOT NULL,
+              confidence REAL,
+              source TEXT NOT NULL,
+              reviewer_note TEXT,
+              updated_at TEXT NOT NULL,
+              UNIQUE (job_id, field_path),
+              FOREIGN KEY (job_id) REFERENCES intake_jobs(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_intake_assertions_job
+              ON intake_field_assertions (job_id);
+
+            CREATE TABLE IF NOT EXISTS intake_audit_events (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              job_id TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              event_type TEXT NOT NULL,
+              payload_json TEXT,
+              FOREIGN KEY (job_id) REFERENCES intake_jobs(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_intake_audit_job
+              ON intake_audit_events (job_id);
+            """
+        )
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (3)")
 
 
 def init_db() -> None:
