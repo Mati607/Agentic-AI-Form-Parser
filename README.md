@@ -1,4 +1,4 @@
-# FormPilot – AI Document-to-Form Demo
+# FormPilot – AI Document-to-Form
 
 Upload passport and G-28 (PDF or image), extract data with **BAML + Gemini**, and fill a test form via **Playwright**. The app does not submit or sign the form.
 
