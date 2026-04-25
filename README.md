@@ -1,4 +1,4 @@
-# AI Document & Form Automation
+# FormPilot – AI Document-to-Form Demo
 
 Upload passport and G-28 (PDF or image), extract data with **BAML + Gemini**, and fill a test form via **Playwright**. The app does not submit or sign the form.
 
@@ -64,6 +64,8 @@ Use `-v` for verbose output or `-k "test_name"` to run a subset of tests.
 - **Fill preview** — `POST /preview-fill` returns which mapped fields have values (same mapping Playwright uses). No browser or Gemini call.
 - **Extraction readiness** — `POST /extraction-readiness` runs rule-based checks (missing core fields, passport expiry, attorney contact hints, etc.) and returns a score, letter grade, and findings. No LLM call. Saving a session stores this snapshot in SQLite (`quality_json`) and returns it from `POST /extraction-sessions`; the UI shows the report after extract/load.
 - **Saved extraction sessions** — Merged extraction JSON can be stored in SQLite (`POST /extraction-sessions`), listed, exported, deleted, and used to run `POST /extraction-sessions/{id}/fill-form` without re-uploading files. The React app includes a sidebar for these sessions.
+- **Demo mode (no API keys)** — `GET /demo/sample-extraction` and `POST /demo/sample-session` generate realistic sample data locally (no LLM calls) so you can show the full UX without credentials.
+- **Shareable readiness report** — `GET /extraction-sessions/{id}/readiness.md` exports a one-page Markdown scorecard for demos and reviews.
 
 ---
 

@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 from starlette.responses import Response
 
 from app.extraction_quality import build_readiness_report
+from app.extraction_quality.report import readiness_report_to_markdown
 from app.form_filler import fill_form
 from app.preview_fill import normalize_merged_extracted
 from app import session_repository as session_repo
@@ -108,6 +109,25 @@ def export_extraction_session(session_id: str) -> Response:
     return Response(
         content=body,
         media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{session_id}/readiness.md")
+def export_readiness_markdown(session_id: str) -> Response:
+    row = session_repo.get_session(session_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    readiness = row.get("readiness") if isinstance(row, dict) else None
+    if not isinstance(readiness, dict):
+        raise HTTPException(status_code=404, detail="Readiness snapshot not found for this session.")
+    title = row.get("title") if isinstance(row.get("title"), str) and row.get("title") else None
+    subject = row.get("passport_filename") or row.get("g28_filename") or row.get("id")
+    md = readiness_report_to_markdown(readiness, title=title or "Extraction Readiness Report", subject=str(subject))
+    filename = f"readiness-{session_id[:8]}.md"
+    return Response(
+        content=md,
+        media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

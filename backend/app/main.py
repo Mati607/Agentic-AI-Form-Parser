@@ -26,6 +26,7 @@ from app.db import init_db
 from app.form_filler import fill_form
 from app.extraction_quality import build_readiness_report
 from app.preview_fill import build_fill_preview, normalize_merged_extracted
+from app.demo_samples import sample_merged_extraction
 from app.routers import extraction_sessions
 
 
@@ -36,8 +37,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Alma Document & Form Automation",
-    version="0.1.0",
+    title="FormPilot – AI Document-to-Form Demo",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -96,6 +97,39 @@ def extraction_readiness(body: dict = Body(...)):
     """
     normalized = normalize_merged_extracted(body if isinstance(body, dict) else {})
     return build_readiness_report(normalized)
+
+
+@app.get("/demo/sample-extraction")
+def demo_sample_extraction(variant: str = "good"):
+    """
+    Return a demo merged extraction + readiness + fill preview without any external API calls.
+    """
+    merged = sample_merged_extraction(variant=variant)
+    normalized = normalize_merged_extracted(merged)
+    readiness = build_readiness_report(normalized)
+    preview = build_fill_preview(normalized)
+    return {"extracted": merged, "readiness": readiness, "preview_fill": preview}
+
+
+@app.post("/demo/sample-session", status_code=201)
+def demo_create_sample_session(variant: str = "good"):
+    """
+    Create and persist a demo extraction session without any external API calls.
+    """
+    merged = sample_merged_extraction(variant=variant)
+    normalized = normalize_merged_extracted(merged)
+    readiness = build_readiness_report(normalized)
+    from app import session_repository as session_repo
+
+    sid = session_repo.create_session(
+        normalized,
+        title=f"Demo session ({variant})",
+        passport_filename="demo-passport.png",
+        g28_filename="demo-g28.png",
+        notes="Generated locally for demos; no external API calls.",
+        quality_snapshot=readiness,
+    )
+    return {"id": sid, "readiness": readiness, "extracted": normalized}
 
 
 def _validation_error_response(validation_errors: dict) -> tuple[int, dict]:

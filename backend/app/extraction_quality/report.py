@@ -81,3 +81,66 @@ def build_readiness_report(extracted: dict[str, Any]) -> dict[str, Any]:
         },
         "generated_at": generated,
     }
+
+
+def readiness_report_to_markdown(
+    readiness: dict[str, Any],
+    *,
+    title: str | None = None,
+    subject: str | None = None,
+) -> str:
+    """
+    Render a JSON readiness report into a shareable Markdown scorecard.
+    """
+    if not isinstance(readiness, dict):
+        readiness = {}
+    score = readiness.get("score")
+    grade = readiness.get("grade")
+    summary = readiness.get("summary") or ""
+    generated = readiness.get("generated_at") or ""
+    findings = readiness.get("findings") if isinstance(readiness.get("findings"), list) else []
+
+    hdr = title or "Extraction Readiness Report"
+    lines: list[str] = [f"# {hdr}".rstrip()]
+    if subject:
+        lines.append(f"**Subject:** {subject}".rstrip())
+    lines.append(f"**Score:** {score}  \n**Grade:** {grade}".rstrip())
+    if generated:
+        lines.append(f"**Generated:** {generated}".rstrip())
+    if summary:
+        lines.append("")
+        lines.append(summary.strip())
+
+    if not findings:
+        lines.append("")
+        lines.append("## Findings")
+        lines.append("")
+        lines.append("- None")
+        return "\n".join(lines).strip() + "\n"
+
+    def _sev_rank(s: str) -> int:
+        if s == "error":
+            return 0
+        if s == "warn":
+            return 1
+        return 2
+
+    findings_sorted = sorted(
+        (f for f in findings if isinstance(f, dict)),
+        key=lambda f: (_sev_rank(str(f.get("severity") or "")), str(f.get("code") or ""), str(f.get("field") or "")),
+    )
+
+    lines.append("")
+    lines.append("## Findings")
+    lines.append("")
+    for f in findings_sorted:
+        sev = str(f.get("severity") or "info").lower()
+        code = str(f.get("code") or "").strip()
+        field = str(f.get("field") or "").strip()
+        msg = str(f.get("message") or "").strip()
+        label = sev.upper()
+        suffix = f" (`{code}`)" if code else ""
+        where = f" — **{field}**" if field else ""
+        lines.append(f"- **{label}**{suffix}{where}: {msg}".rstrip())
+
+    return "\n".join(lines).strip() + "\n"

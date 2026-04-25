@@ -1,4 +1,4 @@
-# Alma Document Automation – Backend
+# FormPilot – Backend
 
 FastAPI server: upload passport and G-28, extract data with BAML (Gemini 2.0 Flash), fill form with Playwright.
 
@@ -23,3 +23,6 @@ poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `GET /health` – health check
 - `POST /extract` – upload `passport` and/or `g28` (files), returns extracted JSON
 - `POST /fill-form` – same uploads, then opens form in browser and fills (does not submit)
+- `GET /demo/sample-extraction?variant=good|messy` – local sample payload + readiness + preview (no API keys)
+- `POST /demo/sample-session?variant=good|messy` – create a stored demo session (no API keys)
+- `GET /extraction-sessions/{id}/readiness.md` – export readiness scorecard as Markdown

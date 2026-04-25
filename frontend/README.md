@@ -1,8 +1,20 @@
-# React + Vite
+# FormPilot – Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React (Vite) UI for uploading documents, viewing extraction readiness, and managing saved extraction sessions.
 
-Currently, two official plugins are available:
+## Run
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`.
+
+## Demo mode (no API keys)
+
+If the backend is running on port 8000, you can use the backend demo endpoints to create a sample session and then load it from the sidebar.
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
