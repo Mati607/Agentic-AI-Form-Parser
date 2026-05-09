@@ -3,6 +3,7 @@ import './App.css'
 import { API_BASE } from './config'
 import { createExtractionSession, fetchExtractionReadiness, formatApiError } from './api/extractionApi'
 import { ExtractionHistoryPanel } from './ExtractionHistoryPanel'
+import { QualityRulesPanel } from './QualityRulesPanel'
 import { FillPreviewModal } from './FillPreviewModal'
 import { ReadinessReportPanel } from './ReadinessReportPanel'
 import { IntakeView } from './intake/IntakeView'
@@ -43,7 +44,7 @@ function App() {
       return
     }
     let cancelled = false
-    fetchExtractionReadiness(extracted)
+    fetchExtractionReadiness(extracted, { catalog: true })
       .then((rep) => {
         if (!cancelled) setReadinessReport(rep)
       })
@@ -311,6 +312,7 @@ function App() {
         </div>
 
         <aside className="app-aside">
+          <QualityRulesPanel onError={setError} />
           <ExtractionHistoryPanel
             refreshToken={historyRefresh}
             formUrl={formUrl}

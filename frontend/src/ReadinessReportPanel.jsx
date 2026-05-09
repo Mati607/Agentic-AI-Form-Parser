@@ -41,6 +41,9 @@ export function ReadinessReportPanel({ report }) {
               <div className="readiness-finding-body">
                 <span className="readiness-finding-msg">{f.message}</span>
                 {f.field && <code className="readiness-field">{f.field}</code>}
+                {f.catalog?.remediation && (
+                  <p className="readiness-remediation">{f.catalog.remediation}</p>
+                )}
               </div>
             </li>
           ))}

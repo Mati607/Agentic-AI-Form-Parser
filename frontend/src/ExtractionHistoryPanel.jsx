@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   deleteExtractionSession,
+  extractionSessionCsvUrl,
   extractionSessionExportUrl,
+  extractionSessionHtmlUrl,
+  extractionSessionReadinessMdUrl,
   fillFormFromSession,
   getExtractionSession,
   listExtractionSessions,
@@ -169,7 +172,34 @@ export function ExtractionHistoryPanel({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Export JSON
+                  JSON
+                </a>
+                <a
+                  className="history-link"
+                  href={extractionSessionCsvUrl(row.id)}
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  CSV
+                </a>
+                <a
+                  className="history-link"
+                  href={extractionSessionHtmlUrl(row.id)}
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  HTML
+                </a>
+                <a
+                  className="history-link"
+                  href={extractionSessionReadinessMdUrl(row.id)}
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Readiness.md
                 </a>
                 <button
                   type="button"

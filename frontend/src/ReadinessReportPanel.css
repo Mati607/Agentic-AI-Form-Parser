@@ -103,6 +103,13 @@
   border-bottom: 1px solid #f1f5f9;
 }
 
+.readiness-remediation {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted, #64748b);
+  line-height: 1.4;
+}
+
 .readiness-finding-body {
   display: flex;
   flex-direction: column;

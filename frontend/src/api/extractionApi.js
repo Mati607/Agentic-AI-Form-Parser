@@ -27,11 +27,26 @@ async function parseJsonOrThrow(res) {
   throw new Error(formatApiError(err))
 }
 
-export async function fetchExtractionReadiness(extracted) {
-  const res = await fetch(`${API_BASE}/extraction-readiness`, {
+export async function fetchExtractionReadiness(extracted, { catalog = false } = {}) {
+  const q = catalog ? '?catalog=true' : ''
+  const res = await fetch(`${API_BASE}/extraction-readiness${q}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(extracted),
+  })
+  return parseJsonOrThrow(res)
+}
+
+export async function fetchExtractionQualityRules() {
+  const res = await fetch(`${API_BASE}/extraction-quality/rules`)
+  return parseJsonOrThrow(res)
+}
+
+export async function compareExtractions(payload) {
+  const res = await fetch(`${API_BASE}/compare-extractions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   })
   return parseJsonOrThrow(res)
 }
@@ -71,6 +86,22 @@ export async function deleteExtractionSession(id) {
 
 export function extractionSessionExportUrl(id) {
   return `${API_BASE}/extraction-sessions/${id}/export`
+}
+
+export function extractionSessionCsvUrl(id) {
+  return `${API_BASE}/extraction-sessions/${id}/export.csv`
+}
+
+export function extractionSessionHtmlUrl(id) {
+  return `${API_BASE}/extraction-sessions/${id}/export.html`
+}
+
+export function extractionSessionReadinessMdUrl(id) {
+  return `${API_BASE}/extraction-sessions/${id}/readiness.md`
+}
+
+export function extractionSessionsSchemaUrl() {
+  return `${API_BASE}/extraction-sessions/export-schema`
 }
 
 export async function fillFormFromSession(id, formUrl) {
