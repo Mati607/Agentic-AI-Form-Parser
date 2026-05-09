@@ -11,7 +11,7 @@ try:
 except ImportError:
     pass
 
-from fastapi import Body, FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import Body, FastAPI, File, Form, Query, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import ALLOWED_ORIGINS, GOOGLE_API_KEY
@@ -25,6 +25,7 @@ from app.extraction import (
 from app.db import init_db
 from app.form_filler import fill_form
 from app.extraction_quality import build_readiness_report
+from app.extraction_quality.rule_catalog import export_catalog_payload
 from app.preview_fill import build_fill_preview, normalize_merged_extracted
 from app.demo_samples import sample_merged_extraction
 from app.routers import extraction_sessions
@@ -96,15 +97,31 @@ def preview_fill(body: dict = Body(...)):
     return build_fill_preview(normalized)
 
 
+@app.get("/extraction-quality/rules")
+def extraction_quality_rules():
+    """
+    Static catalog of readiness rule codes with titles, categories, and remediation text.
+
+    Useful for UI tooltips and offline documentation; no extraction input required.
+    """
+    return export_catalog_payload()
+
+
 @app.post("/extraction-readiness")
-def extraction_readiness(body: dict = Body(...)):
+def extraction_readiness(
+    body: dict = Body(...),
+    catalog: bool = Query(
+        False,
+        description="If true, each finding includes a catalog block with remediation metadata.",
+    ),
+):
     """
     Rule-based readiness report for a merged extraction (passport + attorney).
 
     No LLM calls: scores completeness and flags likely data issues (e.g. expired passport).
     """
     normalized = normalize_merged_extracted(body if isinstance(body, dict) else {})
-    return build_readiness_report(normalized)
+    return build_readiness_report(normalized, attach_rule_catalog=catalog)
 
 
 @app.get("/demo/sample-extraction")

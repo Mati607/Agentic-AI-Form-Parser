@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
+from app.extraction_quality.checks_extended import run_extended_checks
 from app.extraction_quality.dates import days_from_today, parse_date_fuzzy, utc_today
 
 Severity = Literal["error", "warn", "info"]
@@ -253,4 +254,5 @@ def run_all_checks(passport: dict[str, Any], attorney: dict[str, Any]) -> list[F
     out.extend(check_passport_sex(passport))
     out.extend(check_attorney_identity(attorney))
     out.extend(check_attorney_contact(attorney))
+    out.extend(run_extended_checks(passport, attorney))
     return out

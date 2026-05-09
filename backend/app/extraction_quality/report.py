@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.extraction_quality.checks import run_all_checks
+from app.extraction_quality.rule_catalog import enrich_findings
 
 
 def _score_from_findings(findings: list[dict[str, Any]]) -> int:
@@ -49,7 +50,7 @@ def _summary_line(findings: list[dict[str, Any]], score: int, grade: str) -> str
     return " ".join(parts)
 
 
-def build_readiness_report(extracted: dict[str, Any]) -> dict[str, Any]:
+def build_readiness_report(extracted: dict[str, Any], *, attach_rule_catalog: bool = False) -> dict[str, Any]:
     """
     Build a JSON-serializable readiness report for merged extraction input.
 
@@ -59,6 +60,8 @@ def build_readiness_report(extracted: dict[str, Any]) -> dict[str, Any]:
     attorney = extracted.get("attorney") if isinstance(extracted.get("attorney"), dict) else {}
 
     findings = run_all_checks(passport, attorney)
+    if attach_rule_catalog:
+        findings = enrich_findings(findings)
     score = _score_from_findings(findings)
     grade = _grade_from_score(score)
     by_severity = {"error": 0, "warn": 0, "info": 0}
