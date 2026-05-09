@@ -15,6 +15,9 @@ from app.extraction_quality.report import readiness_report_to_markdown
 from app.form_filler import fill_form
 from app.preview_fill import normalize_merged_extracted
 from app import session_repository as session_repo
+from app.exports.csv_export import session_to_csv_text
+from app.exports.html_export import session_to_html
+from app.exports.merged_json_schema import schema_bundle
 from app.schemas.extraction_sessions import (
     CreateExtractionSessionRequest,
     ExtractionSessionListResponse,
@@ -55,6 +58,16 @@ def list_extraction_sessions(
 ) -> ExtractionSessionListResponse:
     items, total = session_repo.list_sessions(limit=limit, offset=offset)
     return ExtractionSessionListResponse(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/export-schema")
+def get_session_export_schema() -> dict[str, Any]:
+    """
+    JSON Schema bundle for merged extraction payloads and full session export objects.
+
+    Session id is not required; schemas are static documentation.
+    """
+    return schema_bundle()
 
 
 @router.get("/{session_id}")
@@ -109,6 +122,34 @@ def export_extraction_session(session_id: str) -> Response:
     return Response(
         content=body,
         media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{session_id}/export.csv")
+def export_extraction_session_csv(session_id: str) -> Response:
+    row = session_repo.get_session(session_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    body = session_to_csv_text(row)
+    filename = f"extraction-session-{session_id[:8]}.csv"
+    return Response(
+        content=body,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{session_id}/export.html")
+def export_extraction_session_html(session_id: str) -> Response:
+    row = session_repo.get_session(session_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    body = session_to_html(row)
+    filename = f"extraction-session-{session_id[:8]}.html"
+    return Response(
+        content=body,
+        media_type="text/html; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
