@@ -29,6 +29,7 @@ from app.extraction_quality.rule_catalog import export_catalog_payload
 from app.preview_fill import build_fill_preview, normalize_merged_extracted
 from app.demo_samples import sample_merged_extraction
 from app.extraction_compare import compare_extractions_extended
+from app.extraction_compare_presets import get_preset, PRESET_PAIRS
 from app.routers import extraction_sessions
 from app.intake.router import router as intake_router
 from app.intake.retention import sweep_intake_retention
@@ -117,6 +118,45 @@ def compare_extractions_endpoint(body: dict = Body(...)):
         right,
         label_left=label_left,
         label_right=label_right,
+    )
+
+
+@app.get("/compare-extractions/presets")
+def compare_extractions_presets():
+    """List built-in comparison scenarios (curated left/right extraction pairs)."""
+    return {
+        "schema_version": 1,
+        "presets": [
+            {
+                "id": p["id"],
+                "label_left": p.get("label_left"),
+                "label_right": p.get("label_right"),
+            }
+            for p in PRESET_PAIRS
+            if p.get("id")
+        ],
+    }
+
+
+@app.post("/compare-extractions/run-preset")
+def compare_extractions_run_preset(body: dict = Body(...)):
+    """
+    Run compare_extractions_extended using a built-in preset id from GET /compare-extractions/presets.
+    Body: { \"preset_id\": \"name_typo\" }.
+    """
+    if not isinstance(body, dict):
+        body = {}
+    pid = body.get("preset_id")
+    if not isinstance(pid, str) or not pid.strip():
+        raise HTTPException(status_code=400, detail="preset_id is required.")
+    preset = get_preset(pid.strip())
+    if preset is None:
+        raise HTTPException(status_code=404, detail="Unknown preset_id.")
+    return compare_extractions_extended(
+        preset["left"],
+        preset["right"],
+        label_left=str(preset.get("label_left") or ""),
+        label_right=str(preset.get("label_right") or ""),
     )
 
 

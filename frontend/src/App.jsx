@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import './App.css'
 import { API_BASE } from './config'
-import { createExtractionSession, fetchExtractionReadiness, formatApiError } from './api/extractionApi'
+import {
+  createExtractionSession,
+  fetchExtractionReadiness,
+  formatApiError,
+  recomputeSessionReadiness,
+} from './api/extractionApi'
 import { ExtractionHistoryPanel } from './ExtractionHistoryPanel'
 import { QualityRulesPanel } from './QualityRulesPanel'
 import { FillPreviewModal } from './FillPreviewModal'
@@ -24,6 +29,7 @@ function App() {
   const [saving, setSaving] = useState(false)
   const [readinessReport, setReadinessReport] = useState(null)
   const [appMode, setAppMode] = useState('classic')
+  const [recomputeBusy, setRecomputeBusy] = useState(false)
 
   const bumpHistory = useCallback(() => {
     setHistoryRefresh((n) => n + 1)
@@ -165,6 +171,21 @@ function App() {
     if (meta?.readiness) setReadinessReport(meta.readiness)
   }
 
+  const handleRecomputeReadiness = async () => {
+    const sid = loadedSession?.id
+    if (!sid) return
+    setRecomputeBusy(true)
+    setError(null)
+    try {
+      const data = await recomputeSessionReadiness(sid, { catalog: true })
+      if (data?.readiness) setReadinessReport(data.readiness)
+    } catch (e) {
+      setError(e.message || 'Could not recompute readiness.')
+    } finally {
+      setRecomputeBusy(false)
+    }
+  }
+
   const handleFillResultFromHistory = (data) => {
     setResult({
       extracted: data.extracted,
@@ -281,6 +302,16 @@ function App() {
                   {result.errors?.length > 0 && <p className="warn">Warnings: {result.errors.join('; ')}</p>}
                   <ReadinessReportPanel report={readinessReport} />
                   <div className="result-toolbar">
+                    {loadedSession?.id && (
+                      <button
+                        type="button"
+                        onClick={handleRecomputeReadiness}
+                        disabled={recomputeBusy}
+                        title="Re-run readiness rules on the saved session and persist to the server"
+                      >
+                        {recomputeBusy ? 'Updating readiness…' : 'Recompute readiness (server)'}
+                      </button>
+                    )}
                     <button type="button" onClick={() => setPreviewOpen(true)} disabled={!previewExtracted}>
                       Preview fill mapping
                     </button>

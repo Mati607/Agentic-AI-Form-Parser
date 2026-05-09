@@ -64,6 +64,22 @@ def test_update_metadata(repo_db):
     assert repo.update_session_metadata("deadbeef" * 2, title="x") is False
 
 
+def test_update_readiness_snapshot(repo_db):
+    sid = repo.create_session(
+        {"passport": {"first_name": "A"}, "attorney": {}},
+        quality_snapshot={"schema_version": 1, "score": 50, "grade": "D", "findings": []},
+    )
+    new_snap = {"schema_version": 1, "score": 92, "grade": "A", "findings": [{"severity": "info", "message": "ok"}]}
+    assert repo.update_readiness_snapshot(sid, new_snap) is True
+    d = repo.get_session(sid)
+    assert d is not None
+    assert d["readiness"]["score"] == 92
+    assert d["readiness"]["grade"] == "A"
+    items, _ = repo.list_sessions(limit=5, offset=0)
+    assert items[0]["readiness_score"] == 92
+    assert repo.update_readiness_snapshot("deadbeef" * 2, new_snap) is False
+
+
 def test_create_with_quality_snapshot(repo_db):
     sid = repo.create_session(
         {"passport": {"first_name": "A"}, "attorney": {}},

@@ -126,6 +126,34 @@ def test_fill_from_session_invalid_url(session_client):
     assert r.status_code == 400
 
 
+def test_recompute_readiness_updates_stored_snapshot(session_client):
+    sid = session_client.post(
+        "/extraction-sessions",
+        json={
+            "extracted": {
+                "passport": {"last_name": "X", "first_name": "Y", "passport_number": "P1", "date_of_birth": "1990-01-01", "date_of_expiration": "2099-01-01"},
+                "attorney": {"family_name": "L", "email": "e@e.e"},
+            },
+        },
+    ).json()["id"]
+    r = session_client.post(f"/extraction-sessions/{sid}/recompute-readiness?catalog=true")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["session_id"] == sid
+    assert "readiness" in data
+    assert data["readiness"].get("score") is not None
+    findings = data["readiness"].get("findings") or []
+    assert any(isinstance(f.get("catalog"), dict) for f in findings if isinstance(f, dict))
+    again = session_client.get(f"/extraction-sessions/{sid}")
+    assert again.json()["readiness"]["score"] == data["readiness"]["score"]
+
+
+def test_recompute_readiness_not_found(session_client):
+    missing = "a" * 32
+    r = session_client.post(f"/extraction-sessions/{missing}/recompute-readiness")
+    assert r.status_code == 404
+
+
 def test_fill_from_session_not_found(session_client):
     missing_id = "f" * 32
     r = session_client.post(

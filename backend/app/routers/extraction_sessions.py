@@ -93,6 +93,31 @@ def patch_extraction_session(session_id: str, payload: PatchExtractionSessionReq
     return row
 
 
+@router.post("/{session_id}/recompute-readiness")
+def recompute_extraction_session_readiness(
+    session_id: str,
+    catalog: bool = Query(
+        False,
+        description="If true, each finding includes catalog remediation metadata (stored in SQLite).",
+    ),
+) -> dict[str, Any]:
+    """
+    Re-run rule-based readiness on the stored merged extraction and persist the snapshot.
+
+    Use after backend rule changes or manual JSON edits so list/export views stay current.
+    """
+    row = session_repo.get_session(session_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    extracted = row.get("extracted") or {}
+    if not isinstance(extracted, dict):
+        extracted = {}
+    normalized = normalize_merged_extracted(extracted)
+    readiness = build_readiness_report(normalized, attach_rule_catalog=catalog)
+    session_repo.update_readiness_snapshot(session_id, readiness)
+    return {"session_id": session_id, "readiness": readiness}
+
+
 @router.delete("/{session_id}", status_code=204, response_model=None)
 def delete_extraction_session(session_id: str) -> None:
     if not session_repo.delete_session(session_id):

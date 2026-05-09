@@ -51,6 +51,28 @@ export async function compareExtractions(payload) {
   return parseJsonOrThrow(res)
 }
 
+export async function listComparePresets() {
+  const res = await fetch(`${API_BASE}/compare-extractions/presets`)
+  return parseJsonOrThrow(res)
+}
+
+export async function runComparePreset(presetId) {
+  const res = await fetch(`${API_BASE}/compare-extractions/run-preset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ preset_id: presetId }),
+  })
+  return parseJsonOrThrow(res)
+}
+
+export async function recomputeSessionReadiness(sessionId, { catalog = true } = {}) {
+  const q = catalog ? '?catalog=true' : ''
+  const res = await fetch(`${API_BASE}/extraction-sessions/${sessionId}/recompute-readiness${q}`, {
+    method: 'POST',
+  })
+  return parseJsonOrThrow(res)
+}
+
 export async function previewFill(extracted) {
   const res = await fetch(`${API_BASE}/preview-fill`, {
     method: 'POST',

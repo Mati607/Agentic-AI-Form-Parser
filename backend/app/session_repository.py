@@ -158,6 +158,22 @@ def delete_session(session_id: str) -> bool:
         return cur.rowcount > 0
 
 
+def update_readiness_snapshot(session_id: str, quality_snapshot: dict[str, Any]) -> bool:
+    """Persist a new readiness report JSON blob; bumps updated_at."""
+    now = _utc_now_iso()
+    blob = json.dumps(quality_snapshot, ensure_ascii=False)
+    with get_connection() as conn:
+        cur = conn.execute(
+            """
+            UPDATE extraction_sessions
+            SET quality_json = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (blob, now, session_id),
+        )
+        return cur.rowcount > 0
+
+
 def update_last_fill(session_id: str, fill_summary: dict[str, Any]) -> bool:
     """Persist last fill result JSON; bumps updated_at."""
     now = _utc_now_iso()

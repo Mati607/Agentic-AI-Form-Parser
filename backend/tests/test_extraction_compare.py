@@ -168,6 +168,35 @@ def test_compare_extractions_filters_empty_deltas_by_default():
     assert out["deltas"] == []
 
 
+class TestComparePresetsHttp:
+    def test_list_presets(self):
+        client = TestClient(app)
+        r = client.get("/compare-extractions/presets")
+        assert r.status_code == 200
+        data = r.json()
+        assert "presets" in data
+        ids = {p["id"] for p in data["presets"]}
+        assert "name_typo" in ids
+
+    def test_run_preset(self):
+        client = TestClient(app)
+        r = client.post("/compare-extractions/run-preset", json={"preset_id": "name_typo"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body.get("fingerprints", {}).get("identical") is False
+        assert body.get("labels", {}).get("left") == "model_a"
+
+    def test_run_preset_unknown(self):
+        client = TestClient(app)
+        r = client.post("/compare-extractions/run-preset", json={"preset_id": "nope"})
+        assert r.status_code == 404
+
+    def test_run_preset_missing_id(self):
+        client = TestClient(app)
+        r = client.post("/compare-extractions/run-preset", json={})
+        assert r.status_code == 400
+
+
 def test_builtin_presets_compare_cleanly():
     from app.extraction_compare_presets import PRESET_PAIRS
 
