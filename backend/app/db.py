@@ -142,6 +142,11 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
             """
         )
         conn.execute("INSERT INTO schema_migrations (version) VALUES (3)")
+    if 4 not in applied:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(extraction_sessions)").fetchall()]
+        if "tags_json" not in cols:
+            conn.execute("ALTER TABLE extraction_sessions ADD COLUMN tags_json TEXT")
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (4)")
 
 
 def init_db() -> None:
