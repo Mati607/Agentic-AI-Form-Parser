@@ -147,6 +147,35 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         if "tags_json" not in cols:
             conn.execute("ALTER TABLE extraction_sessions ADD COLUMN tags_json TEXT")
         conn.execute("INSERT INTO schema_migrations (version) VALUES (4)")
+    if 5 not in applied:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS citizens (
+              id TEXT PRIMARY KEY,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              display_name TEXT NOT NULL DEFAULT '',
+              email TEXT,
+              phone TEXT,
+              preferred_language TEXT,
+              case_reference TEXT,
+              status TEXT NOT NULL DEFAULT 'active',
+              notes TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_citizens_created_at ON citizens (created_at);
+            CREATE INDEX IF NOT EXISTS idx_citizens_status ON citizens (status);
+            """
+        )
+        cols5 = [r[1] for r in conn.execute("PRAGMA table_info(extraction_sessions)").fetchall()]
+        if "citizen_id" not in cols5:
+            conn.execute("ALTER TABLE extraction_sessions ADD COLUMN citizen_id TEXT")
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_extraction_sessions_citizen_id
+            ON extraction_sessions (citizen_id)
+            """
+        )
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (5)")
 
 
 def init_db() -> None:
