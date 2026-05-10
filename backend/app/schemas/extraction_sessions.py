@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class MergedExtractionIn(BaseModel):
@@ -25,12 +25,34 @@ class CreateExtractionSessionRequest(BaseModel):
     g28_filename: str | None = Field(default=None, max_length=500)
     default_form_url: str | None = Field(default=None, max_length=2000)
     notes: str | None = Field(default=None, max_length=5000)
+    tags: list[str] | None = Field(default=None, max_length=25)
+
+    @field_validator("tags")
+    @classmethod
+    def _validate_tag_items(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        for t in v:
+            if t is not None and len(t) > 64:
+                raise ValueError("Each tag must be at most 64 characters.")
+        return v
 
 
 class PatchExtractionSessionRequest(BaseModel):
     title: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=5000)
     default_form_url: str | None = Field(default=None, max_length=2000)
+    tags: list[str] | None = Field(default=None, max_length=25)
+
+    @field_validator("tags")
+    @classmethod
+    def _validate_tag_items_patch(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        for t in v:
+            if t is not None and len(t) > 64:
+                raise ValueError("Each tag must be at most 64 characters.")
+        return v
 
 
 class FillStoredSessionFormRequest(BaseModel):

@@ -47,6 +47,7 @@ def create_extraction_session(payload: CreateExtractionSessionRequest) -> dict[s
         default_form_url=payload.default_form_url,
         notes=payload.notes,
         quality_snapshot=readiness,
+        tags=payload.tags,
     )
     return {"id": sid, "readiness": readiness}
 
@@ -55,8 +56,39 @@ def create_extraction_session(payload: CreateExtractionSessionRequest) -> dict[s
 def list_extraction_sessions(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    q: str | None = Query(
+        None,
+        max_length=500,
+        description="Case-insensitive substring match on title, notes, filenames, or raw extraction JSON.",
+    ),
+    tag: list[str] | None = Query(
+        None,
+        description="Repeat ?tag= for OR match: sessions that contain any of these tags after normalization.",
+    ),
+    min_score: float | None = Query(
+        None,
+        ge=0,
+        le=100,
+        description="Minimum stored readiness score (quality_json.score).",
+    ),
+    grade: list[str] | None = Query(
+        None,
+        description="Repeat ?grade=A to match any listed readiness letter grades.",
+    ),
+    has_fill: bool | None = Query(
+        None,
+        description="If true, only sessions with a saved last_fill_json; if false, only without.",
+    ),
 ) -> ExtractionSessionListResponse:
-    items, total = session_repo.list_sessions(limit=limit, offset=offset)
+    items, total = session_repo.list_sessions(
+        limit=limit,
+        offset=offset,
+        q=q,
+        tags_any=tag,
+        min_score=min_score,
+        grades=grade,
+        has_fill=has_fill,
+    )
     return ExtractionSessionListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
@@ -80,12 +112,14 @@ def get_extraction_session(session_id: str) -> dict[str, Any]:
 
 @router.patch("/{session_id}")
 def patch_extraction_session(session_id: str, payload: PatchExtractionSessionRequest) -> dict[str, Any]:
-    ok = session_repo.update_session_metadata(
-        session_id,
-        title=payload.title,
-        notes=payload.notes,
-        default_form_url=payload.default_form_url,
-    )
+    meta_kwargs: dict[str, Any] = {
+        "title": payload.title,
+        "notes": payload.notes,
+        "default_form_url": payload.default_form_url,
+    }
+    if "tags" in payload.model_fields_set and payload.tags is not None:
+        meta_kwargs["tags"] = list(payload.tags)
+    ok = session_repo.update_session_metadata(session_id, **meta_kwargs)
     if not ok:
         raise HTTPException(status_code=404, detail="Session not found.")
     row = session_repo.get_session(session_id)
@@ -138,6 +172,7 @@ def export_extraction_session(session_id: str) -> Response:
         "g28_filename": row["g28_filename"],
         "default_form_url": row["default_form_url"],
         "notes": row["notes"],
+        "tags": row.get("tags") or [],
         "extracted": row.get("extracted"),
         "last_fill": row.get("last_fill"),
         "readiness": row.get("readiness"),

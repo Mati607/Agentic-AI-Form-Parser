@@ -208,6 +208,12 @@ _SESSION_ENVELOPE: dict[str, Any] = {
             "type": ["string", "null"],
             "description": "Free-form operator notes stored with the session.",
         },
+        "tags": {
+            "type": "array",
+            "items": {"type": "string", "maxLength": 48},
+            "maxItems": 20,
+            "description": "Normalized lowercase labels for organizing and filtering saved sessions.",
+        },
         "extracted": {
             "type": "object",
             "additionalProperties": False,
