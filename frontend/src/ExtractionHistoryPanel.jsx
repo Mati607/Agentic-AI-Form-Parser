@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { listCitizens } from './api/citizensApi'
 import {
   deleteExtractionSession,
   extractionSessionCsvUrl,
@@ -34,6 +35,7 @@ function splitTagsInput(s) {
 }
 
 const GRADE_OPTIONS = ['A', 'B', 'C', 'D', 'F']
+const CITIZEN_FILTER_UNASSIGNED = '__unassigned__'
 
 /**
  * Sidebar list of server-stored extraction sessions: load, export, delete, re-fill.
@@ -50,6 +52,7 @@ export function ExtractionHistoryPanel({
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [workingId, setWorkingId] = useState(null)
+  const [citizens, setCitizens] = useState([])
 
   const emptyFilters = () => ({
     q: '',
@@ -57,12 +60,26 @@ export function ExtractionHistoryPanel({
     minScore: '',
     grades: [],
     hasFill: 'any',
+    citizenFilter: '',
   })
 
   const [filterDraft, setFilterDraft] = useState(emptyFilters)
   const [filters, setFilters] = useState(emptyFilters)
 
   const [tagDrafts, setTagDrafts] = useState({})
+
+  const loadCitizens = useCallback(async () => {
+    try {
+      const data = await listCitizens({ limit: 200, offset: 0 })
+      setCitizens(data.items || [])
+    } catch {
+      setCitizens([])
+    }
+  }, [])
+
+  useEffect(() => {
+    loadCitizens()
+  }, [loadCitizens, refreshToken])
 
   const loadList = useCallback(async () => {
     setLoading(true)
@@ -72,6 +89,10 @@ export function ExtractionHistoryPanel({
       if (filters.hasFill === 'yes') hasFill = true
       if (filters.hasFill === 'no') hasFill = false
       const minRaw = filters.minScore === '' ? null : Number(filters.minScore)
+      let citizenId
+      let unassignedOnly = false
+      if (filters.citizenFilter === CITIZEN_FILTER_UNASSIGNED) unassignedOnly = true
+      else if (filters.citizenFilter) citizenId = filters.citizenFilter
       const data = await listExtractionSessions({
         limit: 40,
         offset: 0,
@@ -80,6 +101,8 @@ export function ExtractionHistoryPanel({
         minScore: minRaw != null && Number.isFinite(minRaw) ? minRaw : undefined,
         grade: filters.grades,
         hasFill,
+        citizenId,
+        unassignedOnly,
       })
       const list = data.items || []
       setItems(list)
@@ -133,6 +156,22 @@ export function ExtractionHistoryPanel({
       })
     } catch (e) {
       onError?.(e.message || 'Failed to load session.')
+    } finally {
+      setWorkingId(null)
+      onBusy?.(false)
+    }
+  }
+
+  const handleLinkCitizen = async (sessionId, citizenIdRaw) => {
+    setWorkingId(sessionId)
+    onBusy?.(true)
+    try {
+      const cid = citizenIdRaw ? String(citizenIdRaw).trim() : null
+      await patchExtractionSession(sessionId, { citizen_id: cid })
+      await loadList()
+      await loadCitizens()
+    } catch (e) {
+      onError?.(e.message || 'Could not link citizen.')
     } finally {
       setWorkingId(null)
       onBusy?.(false)
@@ -203,8 +242,7 @@ export function ExtractionHistoryPanel({
         </button>
       </div>
       <p className="history-panel-hint">
-        Stored on the server (SQLite). Filter by text, tags, readiness, or fill state. Edit comma-separated tags per
-        session (saved on the server).
+        Stored on the server (SQLite). Link rows to a citizen profile, filter by assignment, tags, or readiness.
       </p>
 
       <div className="history-filters" aria-label="Session filters">
@@ -266,6 +304,21 @@ export function ExtractionHistoryPanel({
             <option value="no">None</option>
           </select>
         </label>
+        <label className="history-filter-field history-filter-citizen">
+          <span>Citizen</span>
+          <select
+            value={filterDraft.citizenFilter}
+            onChange={(e) => setFilterDraft((f) => ({ ...f, citizenFilter: e.target.value }))}
+          >
+            <option value="">Any</option>
+            <option value={CITIZEN_FILTER_UNASSIGNED}>Unassigned only</option>
+            {citizens.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.display_name}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="history-filter-actions">
           <button type="button" className="history-filter-apply" onClick={applyFilterDraft} disabled={loading}>
             Apply filters
@@ -305,7 +358,27 @@ export function ExtractionHistoryPanel({
                   ? ` · readiness ${row.readiness_grade} (${row.readiness_score})`
                   : ''}
                 {row.has_last_fill ? ' · last fill saved' : ''}
+                {row.citizen_display_name
+                  ? ` · citizen: ${row.citizen_display_name}`
+                  : row.citizen_id
+                    ? ' · citizen linked'
+                    : ''}
               </div>
+              <label className="history-citizen-assign">
+                <span>Assign to citizen</span>
+                <select
+                  value={row.citizen_id || ''}
+                  onChange={(e) => handleLinkCitizen(row.id, e.target.value || null)}
+                  disabled={workingId === row.id}
+                >
+                  <option value="">— Unassigned —</option>
+                  {citizens.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="history-tags-edit">
                 <span className="sr-only">Tags for this session</span>
                 <input

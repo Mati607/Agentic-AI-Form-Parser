@@ -91,6 +91,8 @@ export async function previewFill(extracted) {
  * @param {number} [opts.minScore] - minimum readiness score
  * @param {string[]} [opts.grade] - readiness grades (e.g. A, B)
  * @param {boolean|null} [opts.hasFill] - true / false to filter on last fill
+ * @param {string} [opts.citizenId] - filter by linked citizen
+ * @param {boolean} [opts.unassignedOnly] - only sessions with no citizen
  */
 export async function listExtractionSessions(opts = {}, legacyOffset = 0) {
   const o =
@@ -105,6 +107,8 @@ export async function listExtractionSessions(opts = {}, legacyOffset = 0) {
     minScore,
     grade = [],
     hasFill,
+    citizenId,
+    unassignedOnly,
   } = o
 
   const sp = new URLSearchParams()
@@ -128,6 +132,8 @@ export async function listExtractionSessions(opts = {}, legacyOffset = 0) {
   }
   if (hasFill === true) sp.set('has_fill', 'true')
   if (hasFill === false) sp.set('has_fill', 'false')
+  if (citizenId != null && String(citizenId).trim()) sp.set('citizen_id', String(citizenId).trim())
+  if (unassignedOnly === true) sp.set('unassigned_only', 'true')
 
   const res = await fetch(`${API_BASE}/extraction-sessions?${sp.toString()}`)
   return parseJsonOrThrow(res)

@@ -80,6 +80,16 @@
   max-width: 140px;
 }
 
+.history-filter-citizen {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 520px) {
+  .history-filter-citizen {
+    grid-column: auto;
+  }
+}
+
 .history-grade-toggles {
   display: flex;
   flex-wrap: wrap;
@@ -195,6 +205,24 @@
 .history-tags-save:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.history-citizen-assign {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0.35rem 0 0.25rem 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #495057;
+}
+
+.history-citizen-assign select {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  max-width: 100%;
 }
 
 .history-empty {

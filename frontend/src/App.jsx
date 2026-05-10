@@ -7,6 +7,7 @@ import {
   formatApiError,
   recomputeSessionReadiness,
 } from './api/extractionApi'
+import { CitizensPortal } from './CitizensPortal'
 import { ExtractionHistoryPanel } from './ExtractionHistoryPanel'
 import { QualityRulesPanel } from './QualityRulesPanel'
 import { FillPreviewModal } from './FillPreviewModal'
@@ -29,6 +30,7 @@ function App() {
   const [saving, setSaving] = useState(false)
   const [readinessReport, setReadinessReport] = useState(null)
   const [appMode, setAppMode] = useState('classic')
+  const [portalSection, setPortalSection] = useState('workspace')
   const [recomputeBusy, setRecomputeBusy] = useState(false)
 
   const bumpHistory = useCallback(() => {
@@ -203,28 +205,52 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>FormPilot — Document &amp; form automation</h1>
+        <h1>Citizen Management Portal</h1>
         <p>
-          Upload passport and/or G-28 (PDF or image). Extract data, review readiness, preview mapped fields, save
-          sessions, and fill the form.
+          Manage citizen profiles, document intake, extraction quality, and form automation in one place.
         </p>
-        <div className="field checkbox" style={{ marginTop: '0.75rem' }}>
-          <label>
-            <input type="radio" name="appMode" checked={appMode === 'classic'} onChange={() => setAppMode('classic')} />
-            Classic extract &amp; fill
-          </label>
-          <label style={{ marginLeft: '1rem' }}>
-            <input type="radio" name="appMode" checked={appMode === 'intake'} onChange={() => setAppMode('intake')} />
-            Intake &amp; review (pipeline)
-          </label>
-        </div>
+        <nav className="portal-nav" aria-label="Primary">
+          <button
+            type="button"
+            className={portalSection === 'workspace' ? 'portal-nav-btn active' : 'portal-nav-btn'}
+            onClick={() => setPortalSection('workspace')}
+          >
+            Workspace
+          </button>
+          <button
+            type="button"
+            className={portalSection === 'citizens' ? 'portal-nav-btn active' : 'portal-nav-btn'}
+            onClick={() => setPortalSection('citizens')}
+          >
+            Citizens
+          </button>
+        </nav>
+        {portalSection === 'workspace' && (
+          <div className="field checkbox" style={{ marginTop: '0.75rem' }}>
+            <label>
+              <input
+                type="radio"
+                name="appMode"
+                checked={appMode === 'classic'}
+                onChange={() => setAppMode('classic')}
+              />
+              Classic extract &amp; fill
+            </label>
+            <label style={{ marginLeft: '1rem' }}>
+              <input type="radio" name="appMode" checked={appMode === 'intake'} onChange={() => setAppMode('intake')} />
+              Intake &amp; review (pipeline)
+            </label>
+          </div>
+        )}
       </header>
 
       {error && <div className="message error">{error}</div>}
 
       <div className="app-layout">
         <div className="app-main">
-          {appMode === 'intake' ? (
+          {portalSection === 'citizens' ? (
+            <CitizensPortal onError={setError} onBusy={setLoading} refreshToken={historyRefresh} />
+          ) : appMode === 'intake' ? (
             <IntakeView
               onError={setError}
               onBusy={setLoading}
@@ -343,15 +369,26 @@ function App() {
         </div>
 
         <aside className="app-aside">
-          <QualityRulesPanel onError={setError} />
-          <ExtractionHistoryPanel
-            refreshToken={historyRefresh}
-            formUrl={formUrl}
-            onLoadExtracted={handleLoadFromHistory}
-            onFillResult={handleFillResultFromHistory}
-            onError={setError}
-            onBusy={setLoading}
-          />
+          {portalSection === 'workspace' && <QualityRulesPanel onError={setError} />}
+          {portalSection === 'workspace' && (
+            <ExtractionHistoryPanel
+              refreshToken={historyRefresh}
+              formUrl={formUrl}
+              onLoadExtracted={handleLoadFromHistory}
+              onFillResult={handleFillResultFromHistory}
+              onError={setError}
+              onBusy={setLoading}
+            />
+          )}
+          {portalSection === 'citizens' && (
+            <section className="aside-hint" aria-label="Sidebar hint">
+              <h2 className="aside-hint-title">Linking sessions</h2>
+              <p className="aside-hint-text">
+                Open <strong>Workspace</strong>, then use &quot;Assign to citizen&quot; on a saved extraction to attach it
+                to a profile listed here.
+              </p>
+            </section>
+          )}
         </aside>
       </div>
     </div>
