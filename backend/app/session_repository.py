@@ -87,6 +87,12 @@ def _row_to_summary(row: Any) -> dict[str, Any]:
         out["readiness_score"] = quality.get("score")
         out["readiness_grade"] = quality.get("grade")
     out["tags"] = _parse_tags_blob(row["tags_json"])
+    cid = row["citizen_id"] if "citizen_id" in row.keys() else None
+    if cid:
+        out["citizen_id"] = str(cid)
+        cname = row["citizen_display_name"] if "citizen_display_name" in row.keys() else None
+        if cname:
+            out["citizen_display_name"] = str(cname)
     return out
 
 
@@ -114,6 +120,9 @@ def _row_to_detail(row: Any) -> dict[str, Any]:
     return detail
 
 
+_METADATA_UNSET = object()
+
+
 def create_session(
     extracted: dict[str, Any],
     *,
@@ -124,6 +133,7 @@ def create_session(
     notes: str | None = None,
     quality_snapshot: dict[str, Any] | None = None,
     tags: list[str] | None = None,
+    citizen_id: str | None = None,
 ) -> str:
     """Insert a new session; returns generated id (UUID hex)."""
     sid = uuid.uuid4().hex
@@ -133,13 +143,15 @@ def create_session(
     tags_blob = (
         json.dumps(normalize_tags_list(tags), ensure_ascii=False) if tags is not None else None
     )
+    cid = str(citizen_id).strip() if citizen_id else None
     with get_connection() as conn:
         conn.execute(
             """
             INSERT INTO extraction_sessions (
               id, created_at, updated_at, title, passport_filename, g28_filename,
-              default_form_url, extracted_json, last_fill_json, notes, quality_json, tags_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+              default_form_url, extracted_json, last_fill_json, notes, quality_json, tags_json,
+              citizen_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
             """,
             (
                 sid,
@@ -153,6 +165,7 @@ def create_session(
                 notes,
                 qblob,
                 tags_blob,
+                cid,
             ),
         )
     return sid
@@ -167,6 +180,8 @@ def list_sessions(
     min_score: float | None = None,
     grades: list[str] | None = None,
     has_fill: bool | None = None,
+    citizen_id: str | None = None,
+    unassigned_only: bool = False,
 ) -> tuple[list[dict[str, Any]], int]:
     """Return (page of summaries, total count). Optional filters combine with AND."""
     limit = max(1, min(limit, 200))
@@ -177,8 +192,8 @@ def list_sessions(
     if q and q.strip():
         term = f"%{q.strip()}%"
         where_parts.append(
-            "(title LIKE ? OR notes LIKE ? OR passport_filename LIKE ? OR "
-            "g28_filename LIKE ? OR extracted_json LIKE ?)"
+            "(s.title LIKE ? OR s.notes LIKE ? OR s.passport_filename LIKE ? OR "
+            "s.g28_filename LIKE ? OR s.extracted_json LIKE ?)"
         )
         params.extend([term, term, term, term, term])
 
@@ -186,13 +201,13 @@ def list_sessions(
     if tag_vals:
         placeholders = ",".join("?" * len(tag_vals))
         where_parts.append(
-            f"EXISTS (SELECT 1 FROM json_each(COALESCE(tags_json, '[]')) AS je "
+            f"EXISTS (SELECT 1 FROM json_each(COALESCE(s.tags_json, '[]')) AS je "
             f"WHERE je.value IN ({placeholders}))"
         )
         params.extend(tag_vals)
 
     if min_score is not None:
-        where_parts.append("CAST(json_extract(quality_json, '$.score') AS REAL) >= ?")
+        where_parts.append("CAST(json_extract(s.quality_json, '$.score') AS REAL) >= ?")
         params.append(float(min_score))
 
     if grades:
@@ -200,27 +215,38 @@ def list_sessions(
         gnorm = [g for g in gnorm if g]
         if gnorm:
             placeholders = ",".join("?" * len(gnorm))
-            where_parts.append(f"json_extract(quality_json, '$.grade') IN ({placeholders})")
+            where_parts.append(f"json_extract(s.quality_json, '$.grade') IN ({placeholders})")
             params.extend(gnorm)
 
     if has_fill is True:
-        where_parts.append("last_fill_json IS NOT NULL AND TRIM(COALESCE(last_fill_json, '')) != ''")
+        where_parts.append("s.last_fill_json IS NOT NULL AND TRIM(COALESCE(s.last_fill_json, '')) != ''")
     elif has_fill is False:
-        where_parts.append("(last_fill_json IS NULL OR TRIM(COALESCE(last_fill_json, '')) = '')")
+        where_parts.append("(s.last_fill_json IS NULL OR TRIM(COALESCE(s.last_fill_json, '')) = '')")
+
+    if unassigned_only:
+        where_parts.append("(s.citizen_id IS NULL OR TRIM(COALESCE(s.citizen_id, '')) = '')")
+    elif citizen_id and str(citizen_id).strip():
+        where_parts.append("s.citizen_id = ?")
+        params.append(str(citizen_id).strip())
 
     where_sql = " AND ".join(where_parts)
+    from_clause = """
+        extraction_sessions s
+        LEFT JOIN citizens c ON c.id = s.citizen_id
+    """
     with get_connection() as conn:
         total = conn.execute(
-            f"SELECT COUNT(*) AS c FROM extraction_sessions WHERE {where_sql}",
+            f"SELECT COUNT(*) AS c FROM {from_clause} WHERE {where_sql}",
             params,
         ).fetchone()["c"]
         rows = conn.execute(
             f"""
-            SELECT id, created_at, updated_at, title, passport_filename, g28_filename,
-                   default_form_url, extracted_json, last_fill_json, notes, quality_json, tags_json
-            FROM extraction_sessions
+            SELECT s.id, s.created_at, s.updated_at, s.title, s.passport_filename, s.g28_filename,
+                   s.default_form_url, s.extracted_json, s.last_fill_json, s.notes, s.quality_json, s.tags_json,
+                   s.citizen_id, c.display_name AS citizen_display_name
+            FROM {from_clause}
             WHERE {where_sql}
-            ORDER BY datetime(created_at) DESC
+            ORDER BY datetime(s.created_at) DESC
             LIMIT ? OFFSET ?
             """,
             [*params, limit, offset],
@@ -232,9 +258,12 @@ def get_session(session_id: str) -> dict[str, Any] | None:
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT id, created_at, updated_at, title, passport_filename, g28_filename,
-                   default_form_url, extracted_json, last_fill_json, notes, quality_json, tags_json
-            FROM extraction_sessions WHERE id = ?
+            SELECT s.id, s.created_at, s.updated_at, s.title, s.passport_filename, s.g28_filename,
+                   s.default_form_url, s.extracted_json, s.last_fill_json, s.notes, s.quality_json, s.tags_json,
+                   s.citizen_id, c.display_name AS citizen_display_name
+            FROM extraction_sessions s
+            LEFT JOIN citizens c ON c.id = s.citizen_id
+            WHERE s.id = ?
             """,
             (session_id,),
         ).fetchone()
@@ -288,11 +317,12 @@ def update_session_metadata(
     notes: str | None = None,
     default_form_url: str | None = None,
     tags: list[str] | None = None,
+    citizen_id: Any = _METADATA_UNSET,
 ) -> bool:
-    """Patch optional metadata fields; None means leave unchanged (except tags: pass a list to replace)."""
+    """Patch optional metadata; citizen_id uses _METADATA_UNSET to leave unchanged, None clears link."""
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT title, notes, default_form_url, tags_json FROM extraction_sessions WHERE id = ?",
+            "SELECT title, notes, default_form_url, tags_json, citizen_id FROM extraction_sessions WHERE id = ?",
             (session_id,),
         ).fetchone()
         if row is None:
@@ -304,13 +334,17 @@ def update_session_metadata(
             new_tags_blob = row["tags_json"]
         else:
             new_tags_blob = json.dumps(normalize_tags_list(tags), ensure_ascii=False)
+        if citizen_id is _METADATA_UNSET:
+            new_citizen_id = row["citizen_id"]
+        else:
+            new_citizen_id = str(citizen_id).strip() if citizen_id else None
         now = _utc_now_iso()
         cur = conn.execute(
             """
             UPDATE extraction_sessions
-            SET title = ?, notes = ?, default_form_url = ?, tags_json = ?, updated_at = ?
+            SET title = ?, notes = ?, default_form_url = ?, tags_json = ?, citizen_id = ?, updated_at = ?
             WHERE id = ?
             """,
-            (new_title, new_notes, new_url, new_tags_blob, now, session_id),
+            (new_title, new_notes, new_url, new_tags_blob, new_citizen_id, now, session_id),
         )
         return cur.rowcount > 0
