@@ -161,3 +161,34 @@ def test_fill_from_session_not_found(session_client):
         json={"form_url": "https://example.com/form"},
     )
     assert r.status_code == 404
+
+
+def test_session_tags_create_list_patch_export(session_client):
+    c = session_client.post(
+        "/extraction-sessions",
+        json={
+            "extracted": {"passport": {"last_name": "Z"}, "attorney": {}},
+            "title": "Tagged run",
+            "tags": ["Demo", "demo", "priority"],
+        },
+    )
+    assert c.status_code == 201
+    sid = c.json()["id"]
+    one = session_client.get(f"/extraction-sessions/{sid}").json()
+    assert one["tags"] == ["demo", "priority"]
+
+    listed = session_client.get("/extraction-sessions?tag=demo&limit=20").json()
+    assert listed["total"] >= 1
+    assert any(x["id"] == sid for x in listed["items"])
+
+    qlist = session_client.get("/extraction-sessions?q=Tagged").json()
+    assert any(x["id"] == sid for x in qlist["items"])
+
+    p = session_client.patch(f"/extraction-sessions/{sid}", json={"tags": []})
+    assert p.status_code == 200
+    assert p.json().get("tags") == []
+
+    ex = session_client.get(f"/extraction-sessions/{sid}/export")
+    assert ex.status_code == 200
+    body = json.loads(ex.text)
+    assert body.get("tags") == []

@@ -102,3 +102,48 @@ def test_list_pagination(repo_db):
     page2, total2 = repo.list_sessions(limit=2, offset=2)
     assert total2 == 5
     assert page[0]["id"] != page2[0]["id"]
+
+
+def test_tags_create_list_and_filters(repo_db):
+    a = repo.create_session(
+        {"passport": {"first_name": "Z"}, "attorney": {}},
+        title="Alpha case",
+        tags=["Review", "review", "urgent"],
+        quality_snapshot={"score": 40, "grade": "D", "findings": []},
+    )
+    b = repo.create_session(
+        {"passport": {}, "attorney": {}},
+        title="Beta",
+        tags=["done"],
+        quality_snapshot={"score": 90, "grade": "A", "findings": []},
+    )
+    d_a = repo.get_session(a)
+    assert d_a is not None
+    assert d_a["tags"] == ["review", "urgent"]
+
+    page, total = repo.list_sessions(tags_any=["urgent"])
+    assert total == 1
+    assert page[0]["id"] == a
+
+    page2, total2 = repo.list_sessions(q="Alpha")
+    assert total2 == 1
+    assert page2[0]["id"] == a
+
+    page3, total3 = repo.list_sessions(min_score=80.0)
+    assert total3 == 1
+    assert page3[0]["id"] == b
+
+    page4, total4 = repo.list_sessions(grades=["A", "B"])
+    assert total4 == 1
+    assert page4[0]["id"] == b
+
+
+def test_tags_patch_and_has_fill_filter(repo_db):
+    sid = repo.create_session({"passport": {}, "attorney": {}}, tags=["a"])
+    assert repo.update_session_metadata(sid, tags=["b", "c"]) is True
+    assert repo.get_session(sid)["tags"] == ["b", "c"]
+    assert repo.update_last_fill(sid, {"filled": [], "form_url": "https://x"}) is True
+    filled, t = repo.list_sessions(has_fill=True)
+    assert t == 1 and filled[0]["id"] == sid
+    empty, t2 = repo.list_sessions(has_fill=False)
+    assert t2 == 0
