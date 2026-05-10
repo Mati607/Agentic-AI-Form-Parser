@@ -163,6 +163,28 @@ def test_fill_from_session_not_found(session_client):
     assert r.status_code == 404
 
 
+def test_session_link_and_filter_by_citizen(session_client):
+    cc = session_client.post("/citizens", json={"display_name": "Portal user"})
+    assert cc.status_code == 201
+    cid = cc.json()["id"]
+    s = session_client.post(
+        "/extraction-sessions",
+        json={"extracted": {"passport": {"first_name": "P"}, "attorney": {}}, "citizen_id": cid},
+    )
+    assert s.status_code == 201
+    sid = s.json()["id"]
+    g = session_client.get(f"/extraction-sessions/{sid}").json()
+    assert g.get("citizen_id") == cid
+
+    listed = session_client.get(f"/extraction-sessions?citizen_id={cid}").json()
+    assert listed["total"] >= 1
+    assert any(x["id"] == sid for x in listed["items"])
+
+    session_client.patch(f"/extraction-sessions/{sid}", json={"citizen_id": None})
+    un = session_client.get("/extraction-sessions?unassigned_only=true").json()
+    assert any(x["id"] == sid for x in un["items"])
+
+
 def test_session_tags_create_list_patch_export(session_client):
     c = session_client.post(
         "/extraction-sessions",
